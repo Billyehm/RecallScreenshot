@@ -1,0 +1,12 @@
+0 verbose cli /home/rcherki10/.nvm/versions/node/v22.22.2/bin/node /home/rcherki10/.nvm/versions/node/v22.22.2/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@10.9.7
+2 info using node@v22.22.2
+3 silly config load:file:/home/rcherki10/.nvm/versions/node/v22.22.2/lib/node_modules/npm/npmrc
+4 silly config load:file:/home/rcherki10/Projects/RecallAI/.npmrc
+5 silly config load:file:/home/rcherki10/Projects/RecallAI/.home/.npmrc
+6 silly config load:file:/home/rcherki10/.nvm/versions/node/v22.22.2/etc/npmrc
+7 verbose title npm exec expo start --host localhost --port 8081 --clear
+8 verbose argv "exec" "--" "expo" "start" "--host" "localhost" "--port" "8081" "--clear"
+9 verbose logfile logs-max:10 dir:/home/rcherki10/Projects/RecallAI/.home/.npm/_logs/2026-07-13T10_44_24_507Z-
+10 verbose logfile /home/rcherki10/Projects/RecallAI/.home/.npm/_logs/2026-07-13T10_44_24_507Z-debug-0.log
+11 silly logfile done cleaning log files

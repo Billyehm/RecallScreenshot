@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+.yarn/
+.pnp
+.pnp.js
+package-lock.json
+yarn.lock
+
+# Production
+/build
+/dist
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Android
+android/build/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/lint-baseline.xml
+*.apk
+*.aar
+*.so
+*.jniLibs
+
+# iOS
+ios/Pods/
+ios/Podfile.lock
+ios/.DS_Store
+ios/xcuserdata/
+ios/Xcodeproj/xcshareddata/xcschemes/
+ios/build/
+ios/Derived\ Data/
+*.pbxuser
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/
+*.xcodeproj/xcshareddata/xcschemes/
+
+# Temporary files
+*.tmp
+.cache
+.turbo/
+
+# React Native
+.bundle/
+.watchman*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Expo
+.expo/
+dist/
