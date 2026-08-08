@@ -46,28 +46,69 @@ ChatScreen / CollectionsScreen / StatsScreen
   -> MockMemoryRepository
 ```
 
-## Screenshot indexing
+## Offline image intelligence
 
-The screenshot pipeline is currently the most complete persistence path.
+The Android pipeline is local-only. No component declares a network requirement, sends media to a service, or copies original images into app storage.
 
-`src/features/screenshots/native/ScreenshotMediaStore.ts` wraps a native module and exposes:
+```text
+MediaStore ContentObserver / permission grant / 12-hour fallback
+  -> RecallIndexScheduler
+  -> RecallIndexWorker
+  -> MediaStoreScanner (cursor streamed into SQLite)
+  -> batches of 8 Pending rows
+  -> sampled bitmap decode
+  -> bundled ML Kit OCR + bundled ML Kit image labeling
+  -> category rules + fused semantic/visual embedding
+  -> app-cache thumbnail + recall_ai.db metadata
+```
 
-- `queryScreenshots(limit, offset)`
-- `getSha256(contentUri)`
-- `startWatching()`
-- `stopWatching()`
-- `subscribe(listener)`
+`MediaStoreScanner` reads `Screenshots`, `Pictures`, `DCIM`, and `Downloads`. It stores the original `content://` URI and metadata only. The MediaStore ID is the stable primary key, the URI is unique, and changed size/date or embedding version requeues a row. A scan token marks removed images without loading the library into memory. Deletion marking is disabled when Android grants only selected-photo access.
 
-`src/features/screenshots/data/sqliteScreenshotMetadataRepository.ts` coordinates sync:
+`RecallIndexWorker` uses WorkManager with battery-not-low, storage-not-low, and no-network constraints. Work is unique, resumable, and processed sequentially in batches of eight. Pause cancels immediate chains and workers also check the pause flag between images. A periodic scan covers changes received while the React Native process is not observing MediaStore.
 
-1. Runs migrations.
-2. Requests Android image permissions.
-3. Reads screenshot pages from the media store.
-4. Hashes changed files when possible.
-5. Upserts records into `screenshot_metadata`.
-6. Marks missing records as deleted after a scan.
+### Model selection
 
-`src/features/screenshots/hooks/useScreenshotGallery.ts` uses `useInfiniteQuery` with a default page size of 40. It starts the watcher, syncs when media changes, invalidates screenshot queries, and deduplicates merged pages before returning them to screens.
+The first production profile uses the bundled variants of Google ML Kit Latin Text Recognition and Image Labeling. They are Android-optimized learned models, require no runtime model download, run on CPU, and avoid shipping a large dual-encoder model before device profiling is available.
+
+Each image stores a normalized 192-float embedding:
+
+- 128 semantic dimensions derived deterministically from OCR text, learned image labels, filename, and category vocabulary.
+- 64 visual dimensions containing a 4-by-4 spatial grid of RGB means and edge energy.
+
+This profile is deliberately smaller and simpler than MobileCLIP. Natural-language search is strongest for screenshots because OCR and learned labels share the query's semantic space; image-to-image search additionally uses the visual dimensions. It does not claim full open-vocabulary CLIP quality. `embedding_version` makes the boundary explicit: a quantized MobileCLIP or MobileNet dual-encoder can replace the embedding provider later and automatically requeue old rows without changing discovery, storage, WorkManager, or React Native APIs.
+
+### Local schema
+
+`screenshot_metadata` is shared by native Android SQLite and Nitro SQLite through `recall_ai.db` with WAL enabled. Originals are never stored. Relevant index columns are:
+
+- Identity: `id`, unique `media_store_uri`, `file_name`, `relative_path`.
+- Media metadata: size, dimensions, MIME type, created/modified timestamps.
+- Intelligence: `ocr_text`, `image_labels`, `category`, thumbnail cache path, float embedding BLOB, dimensions, and version.
+- Queue state: processing/OCR/embedding status, attempts, error, indexed/updated timestamps, scan token, and soft-delete flag.
+- User state: favorites, hidden/archive flags, notes, tags, and collection references.
+
+Queue and category indexes avoid table scans for worker claims and grouping. Embeddings are little-endian float BLOBs; 10,000 current vectors use about 7.3 MiB before SQLite overhead.
+
+### Search workflows
+
+Text search tokenizes the prompt, produces the same deterministic semantic vector, obtains bounded lexical candidates from filename/OCR/labels/category, and streams completed embeddings through a fixed-size top-K heap. Ranking is 72 percent cosine similarity and 28 percent lexical overlap.
+
+Image similarity reuses an indexed vector when available. For an external selected image it decodes a sampled bitmap and computes the visual subvector locally, then streams the index through the same top-K heap while excluding the selected URI. Neither workflow loads all rows or vectors into a collection.
+
+Categorization combines OCR, filename, and learned labels against fixed on-device vocabularies for Finance, Shopping, Travel, Work, Documents, Education, Social Media, and Entertainment, with `Other` as fallback.
+
+### React Native boundary
+
+`src/features/screenshots/native/ScreenshotMediaStore.ts` exposes paged discovery, index start/pause/resume/status, text search, image similarity, hashing, and MediaStore change subscriptions. `ScreenshotService` keeps screens independent from the native implementation. The existing JS repository remains responsible for gallery paging and user metadata in the shared database.
+
+### Performance and privacy
+
+- MediaStore rows stream directly into SQLite; image results are paged.
+- Only one sampled bitmap is live at a time and is recycled after processing.
+- Thumbnails have a 384-pixel maximum edge and replace stale versions.
+- Search keeps only `limit` results in RAM; limits are capped at 100.
+- Failed work is bounded to three attempts and abandoned processing is recovered after 30 minutes.
+- Bundled ML Kit artifacts perform inference on-device and no analytics, cloud API, remote model, or network worker is used.
 
 ## Database
 

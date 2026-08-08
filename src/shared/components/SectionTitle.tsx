@@ -2,8 +2,7 @@ import React from "react";
 import { Text, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
-import { colors } from "../theme/colors";
-import { styles } from "../theme/styles";
+import { useTheme } from "../theme/ThemeContext";
 
 type SectionTitleProps = {
   icon: string;
@@ -11,6 +10,8 @@ type SectionTitleProps = {
 };
 
 export function SectionTitle({ icon, title }: SectionTitleProps) {
+  const { colors, styles } = useTheme();
+
   return (
     <View style={styles.titleRow}>
       <Ionicons name={icon as React.ComponentProps<typeof Ionicons>["name"]} size={19} color={colors.secondary} />

@@ -4,8 +4,8 @@ import LinearGradient from "react-native-linear-gradient";
 import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 
 import type { Screenshot } from "../types/recall";
-import { colors } from "../theme/colors";
-import { styles } from "../theme/styles";
+import { darkColors } from "../theme/colors";
+import { useTheme } from "../theme/ThemeContext";
 
 type ScreenshotCardProps = {
   shot: Screenshot;
@@ -13,12 +13,20 @@ type ScreenshotCardProps = {
 };
 
 export function ScreenshotCard({ shot, compact = false }: ScreenshotCardProps) {
+  const { colors, styles } = useTheme();
+  const accent =
+    shot.accent === darkColors.secondary
+      ? colors.secondary
+      : shot.accent === darkColors.tertiary
+        ? colors.tertiary
+        : colors.primary;
+
   return (
     <View style={[styles.screenshotCard, compact && styles.compactScreenshot]}>
       {shot.uri ? (
         <Image source={{ uri: shot.uri }} style={styles.previewImage} resizeMode="cover" />
       ) : (
-        <LinearGradient colors={[shot.accent, colors.surfaceHigh, colors.background]} style={styles.previewGradient}>
+        <LinearGradient colors={[accent, colors.surfaceHigh, colors.background]} style={styles.previewGradient}>
           <View style={styles.previewTopLine} />
           <View style={styles.previewRows}>
             <View style={[styles.previewRow, { width: "75%" }]} />
@@ -37,7 +45,7 @@ export function ScreenshotCard({ shot, compact = false }: ScreenshotCardProps) {
             {shot.time} - {shot.source}
           </Text>
         </View>
-        <MaterialCommunityIcons name="shield-check" size={22} color={shot.accent} />
+        <MaterialCommunityIcons name="shield-check" size={22} color={accent} />
       </View>
     </View>
   );

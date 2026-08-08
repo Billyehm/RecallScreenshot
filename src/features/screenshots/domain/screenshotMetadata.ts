@@ -8,9 +8,13 @@ export type ScreenshotMetadata = {
   fileSize: number;
   width: number;
   height: number;
+  mimeType: string;
   dateCreated: number;
   dateModified: number;
   contentHash?: string;
+  thumbnailPath?: string;
+  ocrText: string;
+  category: string;
   processingStatus: ProcessingStatus;
   ocrStatus: ProcessingStatus;
   embeddingStatus: ProcessingStatus;

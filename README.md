@@ -4,6 +4,8 @@ Recall AI is a React Native app for turning local screenshots into a searchable,
 
 ## What is in place
 
+Recall AI is a React Native app for turning local screenshots into a searchable, organized digital memory. The current app shell includes a polished tabbed interface, local screenshot indexing, SQLite metadata storage, and mock AI/memory data that can be replaced by real services over time.
+
 - Home dashboard with search entry, smart suggestion chips, recent screenshots, quick metrics, and an AI prompt shortcut.
 - Chat tab with a conversational UI backed by mock memory messages.
 - Collections tab with mock collection summaries plus recently indexed screenshots.
@@ -83,6 +85,14 @@ npm run android
 ```sh
 npm run ios
 ```
+
+Build a fresh release APK after UI or native changes:
+
+```sh
+npm run android:apk
+```
+
+The command cleans Android outputs before Gradle creates and embeds a new JavaScript bundle. The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. If Metro is showing stale code during development, restart it with `npm run start:reset`.
 
 ## Current data model
 

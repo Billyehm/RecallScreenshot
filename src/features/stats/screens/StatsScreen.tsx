@@ -3,12 +3,13 @@ import { ScrollView, Text, View } from "react-native";
 import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 
 import { MetricCard } from "../../../shared/components/MetricCard";
-import { colors } from "../../../shared/theme/colors";
-import { styles } from "../../../shared/theme/styles";
+import { useTheme } from "../../../shared/theme/ThemeContext";
 import { useEfficiencyMetrics } from "../../memory/hooks/useEfficiencyMetrics";
 
 export function StatsScreen() {
   const { data: efficiency } = useEfficiencyMetrics();
+  const { colors, styles } = useTheme();
+  const efficiencyColors = [colors.primary, colors.secondary, colors.tertiary];
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
@@ -38,10 +39,10 @@ export function StatsScreen() {
 
       <Text style={styles.sectionTitleText}>AI Efficiency Map</Text>
       <View style={styles.efficiencyCard}>
-        {efficiency.map((item) => (
+        {efficiency.map((item, index) => (
           <View key={item.id} style={styles.efficiencyRow}>
             <View>
-              <Text style={[styles.efficiencyLabel, { color: item.color }]}>{item.label}</Text>
+              <Text style={[styles.efficiencyLabel, { color: efficiencyColors[index % efficiencyColors.length] }]}>{item.label}</Text>
               <Text style={styles.bodyMuted}>{item.detail}</Text>
             </View>
             <Text style={styles.efficiencyValue}>{item.value}</Text>

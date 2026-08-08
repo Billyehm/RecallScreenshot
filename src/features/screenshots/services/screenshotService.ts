@@ -2,6 +2,7 @@ import { colors } from "../../../shared/theme/colors";
 import type { Screenshot } from "../../../shared/types/recall";
 import { SQLiteScreenshotMetadataRepository } from "../data/sqliteScreenshotMetadataRepository";
 import type { ScreenshotMetadataRepository } from "../domain/screenshotMetadataRepository";
+import { ScreenshotMediaStore } from "../native/ScreenshotMediaStore";
 
 export class ScreenshotService {
   private syncPromise: Promise<unknown> | null = null;
@@ -18,7 +19,7 @@ export class ScreenshotService {
       items: items.map((item): Screenshot => ({
         id: item.id,
         title: item.fileName,
-        source: item.absolutePath ? "MediaStore" : "Screenshots",
+        source: "Device library",
         time: formatRelativeTime(item.dateCreated),
         accent: colors.primary,
         icon: "image",
@@ -51,6 +52,26 @@ export class ScreenshotService {
 
   subscribe(listener: () => void) {
     return this.repository.subscribe(listener);
+  }
+
+  search(query: string, limit = 40) {
+    return ScreenshotMediaStore.searchText(query, limit);
+  }
+
+  findSimilar(contentUri: string, limit = 40) {
+    return ScreenshotMediaStore.searchSimilar(contentUri, limit);
+  }
+
+  getIndexStatus() {
+    return ScreenshotMediaStore.getIndexStatus();
+  }
+
+  pauseIndexing() {
+    return ScreenshotMediaStore.pauseIndexing();
+  }
+
+  resumeIndexing() {
+    return ScreenshotMediaStore.resumeIndexing();
   }
 }
 

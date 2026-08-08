@@ -2,8 +2,7 @@ import React from "react";
 import { Text, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
-import { colors } from "../theme/colors";
-import { styles } from "../theme/styles";
+import { useTheme } from "../theme/ThemeContext";
 
 type ChatBubbleProps = {
   role: "ai" | "user";
@@ -12,6 +11,7 @@ type ChatBubbleProps = {
 
 export function ChatBubble({ role, text }: ChatBubbleProps) {
   const isUser = role === "user";
+  const { colors, styles } = useTheme();
 
   return (
     <View style={[styles.messageRow, isUser && styles.userMessageRow]}>

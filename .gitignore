@@ -44,6 +44,7 @@ android/.gradle/
 android/local.properties
 android/app/build/
 android/app/lint-baseline.xml
+android/app/src/main/assets/index.android.bundle
 *.apk
 *.aar
 *.so

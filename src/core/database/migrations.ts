@@ -99,6 +99,23 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_file_name ON screenshot_metadata(file_name)`,
       `CREATE INDEX IF NOT EXISTS idx_search_history_created ON search_history(created_at DESC)`
     ]
+  },
+  {
+    version: 2,
+    statements: [
+      `ALTER TABLE screenshot_metadata ADD COLUMN relative_path TEXT`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN mime_type TEXT NOT NULL DEFAULT 'image/*'`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN thumbnail_path TEXT`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN ocr_text TEXT NOT NULL DEFAULT ''`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN image_labels TEXT NOT NULL DEFAULT ''`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN embedding_vector BLOB`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN processing_error TEXT`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN processing_attempts INTEGER NOT NULL DEFAULT 0`,
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_processing ON screenshot_metadata(is_deleted, processing_status, date_created DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_category ON screenshot_metadata(is_deleted, category, date_created DESC)`
+    ]
   }
 ];
 
@@ -117,7 +134,12 @@ async function runMigrations() {
     if (existing.rows?._array.length) continue;
 
     for (const statement of migration.statements) {
-      await executeSql(statement);
+      try {
+        await executeSql(statement);
+      } catch (error) {
+        // The native WorkManager store can initialize the shared schema before JS bootstrap.
+        if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+      }
     }
 
     await executeSql(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, [migration.version, Date.now()]);

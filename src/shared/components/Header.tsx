@@ -1,31 +1,34 @@
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 
-import { colors } from "../theme/colors";
-import { styles } from "../theme/styles";
+import { AnimatedPressable } from "./AnimatedPressable";
+import { useTheme } from "../theme/ThemeContext";
 
 type HeaderProps = {
   onChatPress: () => void;
+  onMenuPress: () => void;
 };
 
-export function Header({ onChatPress }: HeaderProps) {
+export function Header({ onChatPress, onMenuPress }: HeaderProps) {
+  const { colors, styles } = useTheme();
+
   return (
     <View style={styles.header}>
-      <View style={styles.brand}>
+      <AnimatedPressable style={styles.brand} onPress={onMenuPress} pressedScale={0.98}>
         <View style={styles.logoMark}>
           <MaterialCommunityIcons name="memory" size={22} color={colors.primary} />
         </View>
-        <Text style={styles.logoText}>Recall!</Text>
-      </View>
-      <View style={styles.headerActions}>
-        <Pressable style={styles.iconButton} onPress={onChatPress}>
-          <Ionicons name="search" size={20} color={colors.muted} />
-        </Pressable>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>JD</Text>
+        <View>
+          <Text style={styles.logoText}>Recall</Text>
+          <Text style={styles.logoCaption}>Memory workspace</Text>
         </View>
+      </AnimatedPressable>
+      <View style={styles.headerActions}>
+        <AnimatedPressable style={styles.iconButton} onPress={onChatPress}>
+          <Ionicons name="sparkles" size={20} color={colors.secondary} />
+        </AnimatedPressable>
       </View>
     </View>
   );
