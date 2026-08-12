@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "VectorIconsIonicons_autolinked_build",
+		"source" : "/home/rcherki10/Projects/RecallAI/node_modules/@react-native-vector-icons/ionicons/android/build/generated/source/codegen/jni"
+	}
+}

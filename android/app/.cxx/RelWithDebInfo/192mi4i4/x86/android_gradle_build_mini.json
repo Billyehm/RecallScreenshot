@@ -1,0 +1,79 @@
+{
+  "buildFiles": [
+    "/home/rcherki10/Projects/RecallAI/node_modules/@react-native-vector-icons/ionicons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/@react-native-vector-icons/material-design-icons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/react-native-nitro-modules/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/react-native-nitro-sqlite/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt",
+    "/home/rcherki10/Projects/RecallAI/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/rcherki10/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/rcherki10/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
+      "artifactName": "react_codegen_safeareacontext",
+      "abi": "x86",
+      "output": "/home/rcherki10/Projects/RecallAI/android/app/build/intermediates/cxx/RelWithDebInfo/192mi4i4/obj/x86/libreact_codegen_safeareacontext.so",
+      "runtimeFiles": [
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/25022d12e37fa0746c81497912ccedb5/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    },
+    "react_codegen_VectorIconsMaterialDesignIcons::@ec6cd781043477cf3896": {
+      "artifactName": "react_codegen_VectorIconsMaterialDesignIcons",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
+      "artifactName": "react_codegen_rnscreens",
+      "abi": "x86",
+      "output": "/home/rcherki10/Projects/RecallAI/android/app/build/intermediates/cxx/RelWithDebInfo/192mi4i4/obj/x86/libreact_codegen_rnscreens.so",
+      "runtimeFiles": [
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/25022d12e37fa0746c81497912ccedb5/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+      ]
+    },
+    "react_codegen_RNNitroSQLite::@14f6c5269f32e5d7f86a": {
+      "artifactName": "react_codegen_RNNitroSQLite",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "artifactName": "appmodules",
+      "abi": "x86",
+      "output": "/home/rcherki10/Projects/RecallAI/android/app/build/intermediates/cxx/RelWithDebInfo/192mi4i4/obj/x86/libappmodules.so",
+      "runtimeFiles": [
+        "/home/rcherki10/Projects/RecallAI/android/app/build/intermediates/cxx/RelWithDebInfo/192mi4i4/obj/x86/libreact_codegen_safeareacontext.so",
+        "/home/rcherki10/Projects/RecallAI/android/app/build/intermediates/cxx/RelWithDebInfo/192mi4i4/obj/x86/libreact_codegen_rnscreens.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/25022d12e37fa0746c81497912ccedb5/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/rcherki10/.gradle/caches/8.14.5/transforms/c0fe9a23dbe37156837cf26e4005c4e6/transformed/react-android-0.81.5-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    },
+    "react_codegen_NitroModulesSpec::@472a82f9c57d3d3b8644": {
+      "artifactName": "react_codegen_NitroModulesSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_VectorIconsIonicons::@d19b6b0a3fec254dc7d5": {
+      "artifactName": "react_codegen_VectorIconsIonicons",
+      "abi": "x86",
+      "runtimeFiles": []
+    }
+  }
+}

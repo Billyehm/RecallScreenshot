@@ -83,6 +83,11 @@ class OfflineImageIntelligence(private val context: Context) : AutoCloseable {
     }
   }
 
+  /**
+   * Visual half only — used when a similarity query names an image that is not indexed yet, so no
+   * stored vector exists. The semantic half stays zero, and [OfflineSearchEngine] compares over the
+   * visual range alone rather than against jointly-normalized vectors.
+   */
   fun imageEmbedding(uri: Uri): FloatArray {
     val bitmap = decodeSampled(uri, MAX_DECODE_EDGE) ?: throw IllegalArgumentException("Image could not be decoded")
     return try {
@@ -149,8 +154,8 @@ class OfflineImageIntelligence(private val context: Context) : AutoCloseable {
   }
 
   companion object {
-    /** Bumped to 3 for Phase 2: OCR confidence/language, tags and the reworked category set. */
-    const val EMBEDDING_VERSION = 3
+    /** Bumped to 4 for Phase 3: filler words no longer contribute to the semantic half. */
+    const val EMBEDDING_VERSION = 4
     const val SEMANTIC_DIMENSIONS = 128
     const val VISUAL_DIMENSIONS = 64
     const val EMBEDDING_DIMENSIONS = SEMANTIC_DIMENSIONS + VISUAL_DIMENSIONS
@@ -168,6 +173,13 @@ object OfflineEmbedding {
   fun tokenize(text: String): List<String> =
     TOKEN.findAll(text.lowercase()).map { it.value }.filter { it.length > 1 }.toList()
 
+  /**
+   * Tokens that carry meaning. Filler words are the most frequent strings in any screenshot, so
+   * leaving them in would let them dominate both the per-image token budget and the hashed
+   * bag-of-words — every image ends up looking slightly like every other one.
+   */
+  fun contentTokens(text: String): List<String> = tokenize(text).filterNot(STOPWORDS::contains)
+
   fun categoryFor(text: String): String = ScreenshotCategorizer.categorize("", text, emptyList()).category
 
   /**
@@ -176,7 +188,7 @@ object OfflineEmbedding {
    */
   fun textEmbedding(text: String): FloatArray {
     val result = FloatArray(OfflineImageIntelligence.SEMANTIC_DIMENSIONS)
-    val expanded = tokenize(text).toMutableList()
+    val expanded = contentTokens(text).toMutableList()
     val inferredCategory = categoryFor(text)
     if (inferredCategory != ScreenshotCategorizer.OTHER) {
       expanded += tokenize(inferredCategory)
@@ -192,4 +204,24 @@ object OfflineEmbedding {
 
   private fun positiveHash(value: String) = value.hashCode() and Int.MAX_VALUE
   private val TOKEN = Regex("[\\p{L}\\p{N}]+")
+
+  /**
+   * Generic English filler plus the words every screenshot file name already contains. Search-intent
+   * verbs ("find", "show") are stripped by [SearchQuery] instead — they are noise in a query but can
+   * be genuine content inside an image.
+   */
+  private val STOPWORDS = setOf(
+    "the", "and", "for", "are", "but", "not", "you", "your", "yours", "all", "any", "can", "had", "has",
+    "have", "her", "his", "its", "our", "out", "she", "that", "their", "them", "then", "there", "these",
+    "they", "this", "those", "was", "were", "what", "when", "where", "which", "who", "will", "with",
+    "from", "into", "onto", "over", "under", "about", "after", "before", "been", "being", "does", "did",
+    "each", "how", "just", "like", "more", "most", "much", "new", "now", "off", "one", "only", "other",
+    "some", "such", "than", "too", "use", "very", "way", "why", "would", "should", "could", "here",
+    // Two-letter function words. Single characters are already dropped by the tokenizer's length
+    // filter, but these survive it and are among the most frequent strings in any screenshot.
+    "of", "in", "on", "at", "to", "is", "it", "as", "be", "by", "do", "or", "if", "so", "an", "we",
+    "he", "us", "me", "my", "ok", "am", "pm",
+    "screenshot", "screenshots", "screen", "shot", "image", "images", "img", "photo", "photos",
+    "picture", "pictures", "png", "jpg", "jpeg", "webp", "capture",
+  )
 }

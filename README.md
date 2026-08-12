@@ -1,19 +1,35 @@
 # Recall AI
 
-Recall AI is a React Native app for turning local screenshots into a searchable, organized digital memory. The current app shell includes a polished tabbed interface, local screenshot indexing, SQLite metadata storage, and mock AI/memory data that can be replaced by real services over time.
+Recall AI turns the screenshots already on your Android device into a searchable library. Text
+recognition, image labeling, embeddings and ranking all run on-device: no image and no derived data
+ever leaves the phone, and the app makes no network requests of its own.
+
+The shipped manifest does still carry `INTERNET` and `ACCESS_NETWORK_STATE`, merged in from React
+Native, plus `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED` and `FOREGROUND_SERVICE` from WorkManager — none
+are requested by Recall's own code. See "Permissions and platform notes".
 
 ## What is in place
 
-Recall AI is a React Native app for turning local screenshots into a searchable, organized digital memory. The current app shell includes a polished tabbed interface, local screenshot indexing, SQLite metadata storage, and mock AI/memory data that can be replaced by real services over time.
+Five tabs — Home, Search, Categories, Stats, Settings — with the library, image viewer and
+collection picker presented as full-screen modals, and the AI assistant in a side menu.
 
-- Home dashboard with search entry, smart suggestion chips, recent screenshots, quick metrics, and an AI prompt shortcut.
-- Chat tab with a conversational UI backed by mock memory messages.
-- Collections tab with mock collection summaries plus recently indexed screenshots.
-- Stats tab with mock insight and processing metrics.
-- Local screenshot discovery through a `ScreenshotMediaStore` native module bridge.
-- SQLite metadata persistence for screenshot records, collections, notes, tags, search history, favorites, and app settings.
-- React Query for async data loading and cache invalidation.
-- Zustand for lightweight app bootstrap state.
+- **Home** — search entry, recent screenshots, category shortcuts. "See more" opens the library in
+  grid or list layout, the choice persisted.
+- **Search** — queries recognized text and image labels, narrowed by category, date range,
+  has-text and folder. Filters are applied inside the native ranker before its candidate cut, so a
+  narrow filter still returns a full page.
+- **Categories** — categories the indexer names from the images themselves; create your own, add or
+  remove images, disband a category.
+- **Stats** — index progress and what the index occupies on disk.
+- **Settings** — pause indexing, clear derived AI data, delete the database, choose which device
+  folders are in scope.
+- **Viewer** — the full image, with an overflow menu for similar images, recognized text and
+  metadata, plus share and delete. Long-press in the library selects multiple images; delete raises
+  one system confirmation for the whole selection.
+- **Indexing** — a WorkManager pipeline discovers images through MediaStore and processes them in
+  batches, surviving process death and respecting the pause switch.
+- SQLite metadata for screenshots, collections, tags, recognized text and settings; React Query for
+  caching and invalidation; Zustand for bootstrap state; MMKV for preferences.
 
 ## Tech stack
 
@@ -42,12 +58,14 @@ src/
     state/            Global app state
     storage/          Key-value storage wrapper
   features/
-    chat/             Chat screen
-    collections/      Collections screen
+    chat/             On-device assistant, opened as a modal from the side menu
+    collections/      Categories screen and collection membership
     home/             Home dashboard
-    memory/           Mock memory repository, hooks, and service
-    screenshots/      Screenshot sync, metadata repository, and native bridge
-    stats/            Stats screen
+    library/          Full library browser, grid/list layouts
+    screenshots/      Indexing, metadata repository, viewer, and the native bridge
+    search/           Search screen, filters, and the native search repository
+    settings/         Privacy, index controls, folder scope, storage
+    stats/            Index and storage figures
   shared/
     components/       Reusable UI components
     hooks/            Shared hooks
@@ -96,10 +114,17 @@ The command cleans Android outputs before Gradle creates and embeds a new JavaSc
 
 ## Current data model
 
-The app currently has two data paths:
+Every screen reads real local data; there is no mock or sample path left in the app.
 
-- Screenshot metadata is real local data. `src/features/screenshots/services/screenshotService.ts` syncs screenshots from the native media store bridge into SQLite through `src/features/screenshots/data/sqliteScreenshotMetadataRepository.ts`.
-- AI memory content is mocked. `src/features/memory/data/mockMemoryRepository.ts` provides sample screenshots, collections, efficiency metrics, and chat messages for the dashboard-style screens.
+- Screenshot metadata comes from the device. `src/features/screenshots/services/screenshotService.ts`
+  syncs MediaStore through the native bridge into SQLite via
+  `src/features/screenshots/data/sqliteScreenshotMetadataRepository.ts`.
+- Recognized text, image labels, categories and ranking are produced on-device by the Kotlin
+  pipeline and read back through `ScreenshotMediaStore`. Search, the assistant, categories and the
+  stats figures are all served from that index.
+- Original images are never copied. The index stores a MediaStore URI plus one 384px JPEG thumbnail
+  per image under the app cache directory, pruned oldest-first past 96 MB. Lists render the
+  thumbnail; only the viewer decodes the full-resolution original.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for more detail.
 

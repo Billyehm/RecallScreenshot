@@ -116,6 +116,78 @@ const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_processing ON screenshot_metadata(is_deleted, processing_status, date_created DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_category ON screenshot_metadata(is_deleted, category, date_created DESC)`
     ]
+  },
+  {
+    version: 3,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS screenshot_ocr (
+        screenshot_id TEXT PRIMARY KEY NOT NULL,
+        extracted_text TEXT NOT NULL DEFAULT '',
+        confidence REAL NOT NULL DEFAULT 0,
+        language TEXT NOT NULL DEFAULT 'und',
+        processed_at INTEGER NOT NULL DEFAULT 0
+      )`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN auto_tags TEXT NOT NULL DEFAULT '[]'`,
+      `ALTER TABLE screenshot_metadata ADD COLUMN category_confidence REAL NOT NULL DEFAULT 0`,
+      // Category names predate the supported set; rewriting the rows avoids a full re-index.
+      `UPDATE screenshot_metadata SET category = 'Social Media' WHERE category = 'Social'`,
+      `UPDATE screenshot_metadata SET category = 'Messages' WHERE category = 'Messaging'`,
+      // Listing a collection's contents seeks by collection_id, which the composite key cannot serve.
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_collections_collection ON screenshot_collections(collection_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_user_collections_name ON user_collections(name)`
+    ]
+  },
+  {
+    version: 4,
+    statements: [
+      // Phase 3 gives vectors their own row keyed by screenshot, carrying the model version that
+      // produced them. The native indexer creates the same table, so whichever layer opens the
+      // shared database first wins and the other is a no-op.
+      `CREATE TABLE IF NOT EXISTS screenshot_embeddings (
+        screenshot_id TEXT PRIMARY KEY NOT NULL,
+        vector BLOB NOT NULL,
+        dimensions INTEGER NOT NULL DEFAULT 0,
+        model_version INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (screenshot_id) REFERENCES screenshot_metadata(id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_embeddings_version ON screenshot_embeddings(model_version)`,
+      // Carry existing vectors across so search keeps working while the library re-indexes at the
+      // new model version. Dimensions come from the blob length rather than a column the JS schema
+      // may not have yet. OR IGNORE leaves anything the indexer already wrote untouched.
+      `INSERT OR IGNORE INTO screenshot_embeddings (screenshot_id, vector, dimensions, model_version, created_at)
+       SELECT id, embedding_vector, LENGTH(embedding_vector) / 4, embedding_version, updated_at
+       FROM screenshot_metadata
+       WHERE embedding_vector IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query)`
+    ]
+  },
+  {
+    version: 5,
+    statements: [
+      // The list queries order by (date_created DESC, id DESC) so that offset paging is stable across
+      // rows sharing a timestamp. The version 1 and 2 indexes stop at date_created, so SQLite had to
+      // sort the entire visible set to break those ties — on every page, not just the first. Carrying
+      // id into the index makes the ordering a plain index walk.
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_visible ON screenshot_metadata(
+        is_deleted, hidden_flag, archived_flag, date_created DESC, id DESC
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_visible_category ON screenshot_metadata(
+        is_deleted, hidden_flag, archived_flag, category, date_created DESC, id DESC
+      )`,
+      // countByCategory groups completed rows by category behind the same three flags. Every column
+      // it touches is here, so the count runs off the index without reading the table at all.
+      `CREATE INDEX IF NOT EXISTS idx_screenshot_metadata_category_counts ON screenshot_metadata(
+        is_deleted, hidden_flag, archived_flag, processing_status, category
+      )`,
+      // Both are strict prefixes of the two indexes above — same equality columns, shorter tail — so
+      // they can no longer win a query. Every redundant index is maintained on each of the thousands
+      // of row writes an initial index performs, which is where the cost actually lands.
+      `DROP INDEX IF EXISTS idx_screenshot_metadata_category`,
+      `DROP INDEX IF EXISTS idx_screenshot_metadata_flags`,
+      // Keeps the planner's row estimates honest now that several indexes could serve one query.
+      `ANALYZE`
+    ]
   }
 ];
 

@@ -3,88 +3,223 @@ package com.recallai.screenshots
 import android.content.Context
 import android.net.Uri
 import java.util.PriorityQueue
-import kotlin.math.sqrt
 
 data class IndexSearchResult(
   val row: SearchRow,
   val score: Float,
   val ocr: OcrResult,
+  /** Indexed terms this row matched, so the UI can show why it is here. */
+  val matchedTerms: List<String> = emptyList(),
 )
 
+/**
+ * Explicit search-screen filters. These are instructions, not evidence: unlike the category and date
+ * window a query *phrase* implies, every one of them excludes rows outright.
+ */
+data class SearchFilters(
+  val category: String = "",
+  val fromMillis: Long = 0L,
+  val toMillis: Long = 0L,
+  val hasText: Boolean = false,
+  val folder: String = "",
+) {
+  fun withinRange(createdAt: Long): Boolean = toMillis > fromMillis && createdAt >= fromMillis && createdAt < toMillis
+
+  companion object {
+    val NONE = SearchFilters()
+  }
+}
+
+/**
+ * Hybrid retrieval over the offline index: the token table supplies exact-word evidence, the stored
+ * embeddings supply meaning, and [SearchRanker] combines them with the contextual signals.
+ *
+ * Two stages, for two different reasons. The streaming pass scores content evidence only and keeps a
+ * bounded candidate heap, so peak memory is a function of the page size rather than the library
+ * size. The surviving slice is then rescored with category intent, recency, engagement and the
+ * requested date window — signals that should reorder relevant results, not manufacture relevance.
+ */
 class OfflineSearchEngine(
   private val context: Context,
   private val store: RecallIndexStore,
 ) {
   /**
-   * Hybrid text search: lexical coverage over the token index blended with hash-embedding
-   * similarity. The ranking pass streams ids and vectors only — OCR bodies are read afterwards for
-   * the winning rows alone, so a text-heavy library never pulls megabytes through the CursorWindow.
+   * [filters] are the explicit controls on the search screen. They exclude rows before the candidate
+   * heap rather than trimming the ranked page afterwards, so a narrow filter still fills a full page.
+   * The category the *phrase* implies is a separate, softer signal owned by [SearchRanker] — a filter
+   * is an instruction, an inferred category is only evidence.
    */
-  fun searchText(query: String, limit: Int): List<IndexSearchResult> {
-    val safeLimit = limit.coerceIn(1, 100)
-    val semantic = OfflineEmbedding.textEmbedding(query)
-    val queryEmbedding = FloatArray(OfflineImageIntelligence.EMBEDDING_DIMENSIONS).also { semantic.copyInto(it) }
-    OfflineImageIntelligence.normalize(queryEmbedding)
-    val tokens = OfflineEmbedding.tokenize(query).distinct().take(MAX_QUERY_TOKENS)
-    val lexical = store.lexicalMatches(tokens, LEXICAL_CANDIDATES)
-    return hydrate(topK(queryEmbedding, safeLimit, lexical, SEMANTIC_WEIGHT, excludedUri = null))
-  }
-
-  fun searchSimilar(uri: String, limit: Int): List<IndexSearchResult> {
-    val safeLimit = limit.coerceIn(1, 100)
-    val stored = store.findByUri(uri)?.embedding
-    val queryEmbedding = stored ?: OfflineImageIntelligence(context).use { it.imageEmbedding(Uri.parse(uri)) }
-    return hydrate(topK(queryEmbedding, safeLimit, emptyMap(), semanticWeight = 1f, excludedUri = uri))
-  }
-
-  private fun hydrate(ranked: List<ScoredRow>): List<IndexSearchResult> {
-    val ocr = store.ocrSnippets(ranked.map { it.row.id })
-    return ranked.map { IndexSearchResult(it.row, it.score, ocr[it.row.id] ?: EMPTY_OCR) }
-  }
-
-  /** Bounded min-heap: only [limit] results are ever retained, whatever the library size. */
-  private fun topK(
-    query: FloatArray,
+  fun searchText(
+    query: String,
     limit: Int,
+    filters: SearchFilters = SearchFilters.NONE,
+    now: Long = System.currentTimeMillis(),
+  ): List<IndexSearchResult> {
+    val safeLimit = limit.coerceIn(1, MAX_LIMIT)
+    val parsed = SearchQuery.parse(query, now)
+    val weights = if (parsed.hasTerms) RankingWeights.TEXT else RankingWeights.BROWSE
+
+    val semantic = OfflineEmbedding.textEmbedding(parsed.phrase)
+    val vector = FloatArray(OfflineImageIntelligence.EMBEDDING_DIMENSIONS).also { semantic.copyInto(it) }
+    // Compared over the semantic half alone. A text query carries no visual signal, so including the
+    // visual dimensions would penalise stored vectors in proportion to how photographic they are.
+    val vectorQuery = VectorQuery(vector, 0, OfflineImageIntelligence.SEMANTIC_DIMENSIONS)
+
+    val lexical = store.lexicalMatches(parsed.tokens, LEXICAL_CANDIDATES)
+    val candidates = collect(
+      vectorQuery, lexical, weights, now, safeLimit,
+      excludedUri = null,
+      filters = filters,
+    )
+    return rank(candidates, parsed, weights, safeLimit)
+  }
+
+  /**
+   * Similarity uses the image's stored vector when it is already indexed. When it is not, only the
+   * visual descriptor can be computed, so the comparison is restricted to the visual dimensions on
+   * both sides. The source image also lends its category, which keeps the results topically close
+   * rather than merely similar in colour and layout.
+   */
+  fun searchSimilar(uri: String, limit: Int, now: Long = System.currentTimeMillis()): List<IndexSearchResult> {
+    val safeLimit = limit.coerceIn(1, MAX_LIMIT)
+    val source = store.findByUri(uri)
+    val stored = source?.embedding
+    val vectorQuery = if (stored != null) {
+      VectorQuery(stored, 0, stored.size)
+    } else {
+      val visual = OfflineImageIntelligence(context).use { it.imageEmbedding(Uri.parse(uri)) }
+      VectorQuery(visual, OfflineImageIntelligence.SEMANTIC_DIMENSIONS, OfflineImageIntelligence.EMBEDDING_DIMENSIONS)
+    }
+
+    val intent = source?.let { SearchQuery.forCategory(it.category, it.categoryConfidence) } ?: SearchQuery.EMPTY
+    val candidates = collect(
+      vectorQuery, emptyMap(), RankingWeights.SIMILARITY, now, safeLimit,
+      excludedUri = uri,
+      filters = SearchFilters.NONE,
+    )
+    return rank(candidates, intent, RankingWeights.SIMILARITY, safeLimit)
+  }
+
+  /**
+   * Bounded min-heap over the full stream: only [capacity] candidates are ever retained, whatever
+   * the library size. Rows whose vector predates the current model still participate — the hash
+   * space is shared across versions, so a stale vector ranks a little worse rather than not at all.
+   */
+  private fun collect(
+    query: VectorQuery,
     lexical: Map<String, Float>,
-    semanticWeight: Float,
+    weights: RankingWeights,
+    now: Long,
+    limit: Int,
     excludedUri: String?,
-  ): List<ScoredRow> {
-    val queryNorm = sqrt(query.sumOf { (it * it).toDouble() }).toFloat()
-    val heap = PriorityQueue<ScoredRow>(limit, compareBy(ScoredRow::score))
+    filters: SearchFilters,
+  ): List<Candidate> {
+    val capacity = (limit * CANDIDATE_FACTOR).coerceIn(limit, MAX_CANDIDATES)
+    val heap = PriorityQueue<Candidate>(capacity, compareBy(Candidate::relevance))
     store.streamIndexed { row ->
       val embedding = row.embedding ?: return@streamIndexed
-      if (row.uri == excludedUri || embedding.size != query.size) return@streamIndexed
-      val cosine = cosine(query, queryNorm, embedding).coerceAtLeast(0f)
-      val score = semanticWeight * cosine + (1f - semanticWeight) * (lexical[row.id] ?: 0f)
-      if (heap.size < limit) {
-        heap += ScoredRow(row, score)
-      } else if (score > (heap.peek()?.score ?: Float.NEGATIVE_INFINITY)) {
+      if (row.uri == excludedUri) return@streamIndexed
+      if (!matches(row, filters)) return@streamIndexed
+      val candidate = Candidate(
+        row = row,
+        semantic = SearchRanker.cosine(query.vector, query.norm, embedding, query.from, query.to).coerceAtLeast(0f),
+        lexical = lexical[row.id] ?: 0f,
+        recency = SearchRanker.recency(row.createdAt, now),
+        weights = weights,
+      )
+      if (heap.size < capacity) {
+        heap += candidate
+      } else if (candidate.relevance > (heap.peek()?.relevance ?: Float.NEGATIVE_INFINITY)) {
         heap.poll()
-        heap += ScoredRow(row, score)
+        heap += candidate
       }
     }
-    return heap.sortedByDescending { it.score }
+    return heap.toList()
   }
 
-  /** Stored vectors are normalized at write time, so only the query norm has to be divided out. */
-  private fun cosine(query: FloatArray, queryNorm: Float, candidate: FloatArray): Float {
-    if (queryNorm == 0f) return 0f
-    var dot = 0f
-    var candidateNorm = 0f
-    for (index in query.indices) {
-      dot += query[index] * candidate[index]
-      candidateNorm += candidate[index] * candidate[index]
-    }
-    val denominator = queryNorm * sqrt(candidateNorm)
-    return if (denominator == 0f) 0f else dot / denominator
+  /**
+   * Every filter is a hard exclusion, evaluated per streamed row. All of it reads fields the ranking
+   * scan already carries, so filtering costs no extra query and no extra column.
+   */
+  private fun matches(row: SearchRow, filters: SearchFilters): Boolean {
+    if (filters.category.isNotBlank() && !row.category.equals(filters.category, ignoreCase = true)) return false
+    if (filters.hasText && !row.hasText) return false
+    if (filters.toMillis > filters.fromMillis && !filters.withinRange(row.createdAt)) return false
+    if (filters.folder.isNotBlank() && !row.relativePath.contains(filters.folder, ignoreCase = true)) return false
+    return true
   }
 
-  private data class ScoredRow(val row: SearchRow, val score: Float)
+  /**
+   * Full rescoring of the candidate slice, then OCR and matched terms for the page that survives.
+   * OCR is hydrated last on purpose: a single text-heavy screenshot can approach the 2 MB
+   * CursorWindow limit, so it is read for the handful of winners and never during the scan.
+   */
+  private fun rank(
+    candidates: List<Candidate>,
+    parsed: SearchQuery,
+    weights: RankingWeights,
+    limit: Int,
+  ): List<IndexSearchResult> {
+    if (candidates.isEmpty()) return emptyList()
+    val page = candidates
+      .map { candidate -> candidate to SearchRanker.score(candidate.features(parsed), weights) }
+      .sortedByDescending { it.second }
+      .take(limit)
+
+    val ids = page.map { it.first.row.id }
+    val ocr = store.ocrSnippets(ids)
+    val matched = if (parsed.hasTerms) store.matchedTokens(ids, parsed.tokens) else emptyMap()
+    // Only worth checking for multi-term phrases: a single term is already what the token index
+    // matched on, so an exact hit there tells the ranker nothing new.
+    val phrase = if (parsed.tokens.size > 1) parsed.phrase else null
+
+    return page
+      .map { (candidate, base) ->
+        val text = ocr[candidate.row.id] ?: EMPTY_OCR
+        val exact = phrase != null && text.text.contains(phrase, ignoreCase = true)
+        val score = if (exact) SearchRanker.score(candidate.features(parsed, exactPhrase = true), weights) else base
+        IndexSearchResult(candidate.row, score, text, matched[candidate.row.id].orEmpty())
+      }
+      .sortedByDescending { it.score }
+  }
+
+  /** A query vector plus the dimension range it is meaningful over, with its norm computed once. */
+  private class VectorQuery(val vector: FloatArray, val from: Int, val to: Int) {
+    val norm: Float = SearchRanker.norm(vector, from, to)
+  }
+
+  /** Content scores kept alongside the row so stage two does not recompute or re-read anything. */
+  private class Candidate(
+    val row: SearchRow,
+    val semantic: Float,
+    val lexical: Float,
+    val recency: Float,
+    weights: RankingWeights,
+  ) {
+    val relevance: Float = SearchRanker.relevance(
+      RankingFeatures(semantic, lexical, 0f, recency, 0f, inDateRange = false, exactPhrase = false),
+      weights,
+    )
+
+    fun features(parsed: SearchQuery, exactPhrase: Boolean = false) = RankingFeatures(
+      semantic = semantic,
+      lexical = lexical,
+      category = SearchRanker.categoryAgreement(
+        parsed.category, parsed.categoryConfidence, row.category, row.categoryConfidence,
+      ),
+      recency = recency,
+      engagement = SearchRanker.engagement(row.viewCount, row.searchCount),
+      inDateRange = parsed.withinRange(row.createdAt),
+      exactPhrase = exactPhrase,
+    )
+  }
 
   private companion object {
-    const val SEMANTIC_WEIGHT = 0.72f
-    const val MAX_QUERY_TOKENS = 8
+    const val MAX_LIMIT = 100
+
+    /** Over-collect so the contextual pass has room to reorder rather than merely confirm. */
+    const val CANDIDATE_FACTOR = 4
+    const val MAX_CANDIDATES = 400
     const val LEXICAL_CANDIDATES = 1000
     val EMPTY_OCR = OcrResult("", 0f, "und")
   }

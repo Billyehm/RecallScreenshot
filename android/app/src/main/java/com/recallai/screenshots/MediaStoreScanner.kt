@@ -25,7 +25,18 @@ data class IndexedImage(
 
 data class ScanSummary(val scanId: String, val discovered: Int, val queued: Int, val deleted: Int)
 
+/** A device folder the user can bring into or out of indexing scope, with how many images it holds. */
+data class MediaFolder(val name: String, val imageCount: Int, val isIndexed: Boolean)
+
 class MediaStoreScanner(private val context: Context) {
+  /**
+   * Read once per scanner rather than per row: a 10k library would otherwise hit SharedPreferences
+   * ten thousand times, and the scope cannot change mid-scan anyway.
+   */
+  private val scope by lazy { RecallIndexPreferences.indexScope(context) }
+  private val allowedFolders by lazy { RecallIndexPreferences.indexedFolders(context) }
+  private val hasFolderRestriction by lazy { RecallIndexPreferences.hasChosenFolders(context) }
+
   /**
    * Streams MediaStore rows straight into SQLite so a 10k library is never retained in RAM.
    *
@@ -43,7 +54,7 @@ class MediaStoreScanner(private val context: Context) {
       query()?.use { cursor ->
         while (cursor.moveToNext()) {
           val row = cursor.toScannableImage()
-          if (!isSupportedLocation(row.image.relativePath, row.bucket, row.image.fileName)) continue
+          if (!isInScope(row)) continue
           if (!open) {
             store.beginScanChunk()
             open = true
@@ -75,12 +86,60 @@ class MediaStoreScanner(private val context: Context) {
     query()?.use { cursor ->
       while (cursor.moveToNext() && result.size < limit.coerceAtLeast(0)) {
         val row = cursor.toScannableImage()
-        if (!isSupportedLocation(row.image.relativePath, row.bucket, row.image.fileName)) continue
+        if (!isInScope(row)) continue
         val image = row.image
         if (matched++ >= offset.coerceAtLeast(0)) result += image
       }
     }
     return result
+  }
+
+  /**
+   * Every folder that holds images, with the count and whether it is currently indexed. Drives the
+   * folder picker in Settings, so it lists what the device actually has rather than a fixed set.
+   */
+  fun listFolders(): List<MediaFolder> {
+    val counts = LinkedHashMap<String, Int>()
+    query()?.use { cursor ->
+      while (cursor.moveToNext()) {
+        val row = cursor.toScannableImage()
+        val name = folderName(row)
+        if (name.isNotBlank()) counts[name] = (counts[name] ?: 0) + 1
+      }
+    }
+    return counts.entries
+      // Through the same gate the scan uses, so the picker cannot claim a folder is in scope when a
+      // scan would skip it. Only the folder axis applies here: the picker chooses where to look, not
+      // what counts once Recall looks there.
+      .map { (name, count) -> MediaFolder(name, count, inFolderScope(name)) }
+      .sortedByDescending(MediaFolder::imageCount)
+  }
+
+  /**
+   * A row is in scope when both gates admit it: its folder is one Recall may read, and its kind is
+   * one the user asked for. The gates are deliberately independent — narrowing folders should not
+   * change what counts as a screenshot, and widening to all images should not change where Recall
+   * looks.
+   */
+  private fun isInScope(row: ScannableImage): Boolean =
+    inFolderScope("${row.image.relativePath}/${row.bucket}") &&
+      matchesScope(row.image.relativePath, row.bucket, row.image.fileName, scope)
+
+  /**
+   * Until the user picks folders there is no folder restriction at all — [RecallIndexPreferences.IndexScope]
+   * is what keeps a fresh install from reading the whole library. Once they have picked, their choice
+   * is absolute, and a deliberately empty selection indexes nothing.
+   */
+  private fun inFolderScope(location: String): Boolean {
+    if (!hasFolderRestriction) return true
+    val lowered = location.lowercase()
+    return allowedFolders.any(lowered::contains)
+  }
+
+  /** Prefers the first path segment so the picker shows "Pictures" rather than "Pictures/Foo/Bar". */
+  private fun folderName(row: ScannableImage): String {
+    val root = row.image.relativePath.trim('/').substringBefore('/')
+    return root.ifBlank { row.bucket }
   }
 
   private fun query(): Cursor? = context.contentResolver.query(
@@ -126,12 +185,32 @@ class MediaStoreScanner(private val context: Context) {
       return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    fun isSupportedLocation(relativePath: String, bucket: String, fileName: String): Boolean {
-      val location = "$relativePath/$bucket".lowercase()
-      val name = fileName.lowercase()
-      return listOf("dcim", "pictures", "screenshot", "download").any(location::contains) ||
-        listOf("screenshot", "screen_shot", "screen-shot", "screen capture").any(name::contains)
+    /**
+     * Whether an image is the kind [scope] asks for. The folder gate is the caller's business, so
+     * ALL_IMAGES admits every row here and narrowing by folder stays a separate decision.
+     */
+    fun matchesScope(
+      relativePath: String,
+      bucket: String,
+      fileName: String,
+      scope: RecallIndexPreferences.IndexScope,
+    ): Boolean {
+      if (scope == RecallIndexPreferences.IndexScope.ALL_IMAGES) return true
+      return isScreenshot("$relativePath/$bucket", fileName)
     }
+
+    /**
+     * Matches the folder and the file name together, because either alone misses real captures: a
+     * vendor tool may write to DCIM but name the file "Screenshot_…", and a gallery app may rename a
+     * file to something plain while leaving it in Screenshots/.
+     */
+    private fun isScreenshot(location: String, fileName: String): Boolean {
+      val haystack = "$location/$fileName".lowercase()
+      return SCREENSHOT_MARKERS.any(haystack::contains)
+    }
+
+    /** Shapes the common screenshot tools produce, in the folder they write to or the name they give. */
+    private val SCREENSHOT_MARKERS = listOf("screenshot", "screen_shot", "screen-shot", "screen capture")
   }
 
   private data class ScannableImage(val image: IndexedImage, val bucket: String)

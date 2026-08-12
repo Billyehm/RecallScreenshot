@@ -78,18 +78,6 @@ For new screenshot fields:
 3. Update row mapping in `sqliteScreenshotMetadataRepository.ts`.
 4. Update service mapping in `screenshotService.ts` if the UI needs it.
 
-## Replacing mock memory data
-
-Mock memory data lives in `src/features/memory/data/mockMemoryRepository.ts`.
-
-To replace it:
-
-1. Implement the `MemoryRepository` interface from `src/features/memory/domain/memoryRepository.ts`.
-2. Wire the new repository into `MemoryService`.
-3. Keep existing hooks intact unless query behavior changes.
-
-This keeps `HomeScreen`, `ChatScreen`, `CollectionsScreen`, and `StatsScreen` insulated from the data source change.
-
 ## Query keys
 
 Add or update query keys in `src/shared/utils/queryKeys.ts`.
@@ -107,11 +95,56 @@ For schema changes:
 3. Avoid changing old migrations after they may have shipped to a device.
 4. Update repository row types and mappers at the same time.
 
+## Release builds
+
+Signing reads four properties, which belong in `~/.gradle/gradle.properties` rather than the
+repository so the keystore password is never committed:
+
+```properties
+RECALL_STORE_FILE=/absolute/path/to/upload-keystore.jks
+RECALL_STORE_PASSWORD=...
+RECALL_KEY_ALIAS=upload
+RECALL_KEY_PASSWORD=...
+```
+
+`app/build.gradle` defines `hasReleaseSigning` from the presence of `RECALL_STORE_FILE`. When the
+properties are absent the release build signs with the debug key instead of failing, so a fresh
+clone still assembles — but such an APK cannot be published. Confirm which key was used:
+
+```
+apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk
+```
+
+R8 and resource shrinking are both on (`enableProguardInReleaseBuilds`). The keep rules in
+`app/proguard-rules.pro` cover what R8 cannot see by static analysis: Nitro's JNI classes, Fresco's
+`@DoNotStrip` members, the ML Kit model registry, and `RecallIndexWorker`'s
+`(Context, WorkerParameters)` constructor, which WorkManager resolves by name. Anything added later
+that is reached reflectively needs its own rule, and the failure only shows up in release.
+
+`shrinkResources` is safe here because the RN CLI generates `res/raw/keep.xml`, pinning the icon
+fonts and drawables that are only ever named from JS.
+
+Keep `app/build/outputs/mapping/release/mapping.txt` for any distributed build — it is the only way
+to read an obfuscated production stack trace.
+
+Verify in this order; each gate catches a different class of failure:
+
+```
+npx tsc --noEmit
+cd android && ./gradlew :app:testDebugUnitTest
+./gradlew :app:assembleRelease
+```
+
+Since R8 never runs in debug, install and exercise the release APK — indexing, search, delete —
+before trusting it.
+
 ## Current limitations
 
-- Search UI is present but does not execute a query yet.
-- Chat composer stores draft text locally but does not send messages.
-- Collection creation and suggestion actions are visual only.
-- AI metrics are sample data.
-- Screenshot OCR, embeddings, and semantic search are represented in schema fields but are not implemented in the TypeScript layer yet.
+- No JavaScript test suite. `npx tsc --noEmit` is the only static gate on the TypeScript side; the
+  Kotlin pipeline is covered by `OfflinePipelineTest`.
+- No lint configuration is checked in, so `npx eslint` fails outright.
+- Search ranks on recognized text and image labels. The stats screen reports index and storage
+  counts, not measured inference timings.
+- Android only in practice. `ios/` holds the stock RN scaffold, but the indexing pipeline, search,
+  OCR and thumbnails are all Kotlin — there is no iOS implementation of `ScreenshotMediaStore`.
 

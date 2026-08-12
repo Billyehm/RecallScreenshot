@@ -5,6 +5,11 @@ import { colors, type AppColors } from "./colors";
 export function createStyles(colors: AppColors) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
+  introStage: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background, paddingHorizontal: 28 },
+  introBrand: { flexDirection: "row", alignItems: "center", gap: 14 },
+  introMark: { width: 64, height: 64, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.primaryOutline, backgroundColor: colors.primarySoft },
+  introTitle: { color: colors.text, fontSize: 38, lineHeight: 46, fontWeight: "900", letterSpacing: 4 },
+  introTagline: { marginTop: 18, color: colors.muted, fontSize: 15, lineHeight: 22, fontWeight: "700", textAlign: "center" },
   appShell: { flex: 1, backgroundColor: colors.background, paddingTop: 8 },
   header: {
     height: 62,
@@ -85,7 +90,10 @@ export function createStyles(colors: AppColors) {
     borderColor: colors.primaryOutline,
     backgroundColor: colors.surfaceGlass,
     paddingHorizontal: 16,
-    paddingVertical: 10
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
   },
   chipText: { color: colors.text, fontSize: 13, fontWeight: "800" },
   selectedChip: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
@@ -183,8 +191,8 @@ export function createStyles(colors: AppColors) {
     gap: 10
   },
   askText: { flex: 1, color: colors.text, fontSize: 15, fontWeight: "800" },
-  chatShell: { flex: 1, paddingHorizontal: 16, paddingBottom: 92 },
-  chatShellKeyboard: { paddingBottom: 12 },
+  // No tab-bar clearance: the conversation is presented as a full-screen modal, over the tab bar.
+  chatShell: { flex: 1, paddingHorizontal: 16, paddingBottom: 12 },
   chatList: { flex: 1 },
   chatContent: { paddingTop: 16, paddingBottom: 16, gap: 16 },
   datePill: {
@@ -217,6 +225,7 @@ export function createStyles(colors: AppColors) {
     gap: 5
   },
   typingDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.primary },
+  clarificationChoices: { marginLeft: 38, gap: 8, alignItems: "flex-start" },
   chatComposer: {
     minHeight: 56,
     maxHeight: 104,
@@ -287,19 +296,48 @@ export function createStyles(colors: AppColors) {
     gap: 10
   },
   actionNoticeText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 19, fontWeight: "700" },
-  collectionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
-  collectionItem: { width: "47%", gap: 10 },
+  collectionGrid: { gap: 10 },
+  collectionItem: { width: "100%" },
   collectionFolder: {
-    aspectRatio: 1,
+    minHeight: 54,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.outline,
     backgroundColor: colors.surface,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    flexDirection: "row",
+    paddingHorizontal: 16,
     gap: 12
   },
-  collectionName: { color: colors.text, textAlign: "center", fontSize: 16, fontWeight: "800" },
+  collectionName: { flex: 1, color: colors.text, fontSize: 16, fontWeight: "800" },
+  collectionCount: { color: colors.muted, fontSize: 12, fontWeight: "700" },
+  // The two tile corners are reserved for actions, so the folder glyph keeps the middle to itself.
+  collectionTileAction: {
+    position: "absolute",
+    top: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceGlassHigh
+  },
+  collectionTileActionLeft: { left: 6 },
+  collectionActionRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  memberCard: { position: "relative" },
+  // Sits over the thumbnail's top-right corner; the card underneath still opens the viewer.
+  memberRemoveButton: {
+    position: "absolute",
+    right: 8,
+    top: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceGlassHighest
+  },
   heroMetric: {
     minHeight: 290,
     borderRadius: 12,
@@ -348,14 +386,16 @@ export function createStyles(colors: AppColors) {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     shadowColor: "#000000",
     shadowOpacity: 0.34,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 12
   },
-  navItem: { minWidth: 68, minHeight: 48, borderRadius: 22, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 8 },
+  // flex:1 rather than a fixed width: five tabs have to divide the bar on a narrow phone, and a
+  // minimum width would push the last one off the edge.
+  navItem: { flex: 1, minHeight: 48, borderRadius: 22, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 2 },
   activeNavItem: { backgroundColor: colors.primaryContainer },
   navLabel: { color: colors.muted, fontSize: 10, fontWeight: "900" },
   activeNavLabel: { color: colors.onPrimary },
@@ -404,6 +444,19 @@ export function createStyles(colors: AppColors) {
     gap: 12
   },
   menuItemText: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: "900" },
+  // The AI entry. Tinted apart from the plain destinations below it because it opens a modal
+  // rather than switching tabs.
+  menuFeatureItem: {
+    minHeight: 60,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.primaryOutline,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
   themeToggle: {
     minHeight: 58,
     borderRadius: 16,
@@ -466,7 +519,366 @@ export function createStyles(colors: AppColors) {
     fontSize: 16
   },
   inputError: { color: colors.tertiary, fontSize: 12, lineHeight: 17, fontWeight: "700" },
-  modalActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 10 }
+  modalActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 10 },
+  viewerRoot: { flex: 1, backgroundColor: colors.background },
+  viewerBar: {
+    minHeight: 62,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outline,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  viewerTitle: { color: colors.text, fontSize: 17, lineHeight: 22, fontWeight: "800" },
+  viewerContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 20 },
+  viewerImageFrame: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  viewerImage: { width: "100%", height: "100%", position: "absolute" },
+  viewerSpinner: { position: "absolute" },
+  viewerSection: { gap: 10 },
+  // The image-only stage stays black in both themes: a surface tint next to a photo reads as a cast.
+  viewerStage: { flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" },
+  viewerFullImage: { width: "100%", height: "100%" },
+  viewerOverlayTop: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  viewerOverlayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(0,0,0,0.52)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  viewerMenuScrim: { ...StyleSheet.absoluteFillObject },
+  viewerMenu: {
+    position: "absolute",
+    right: 12,
+    minWidth: 244,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surfaceGlassHighest,
+    padding: 6,
+    gap: 2,
+    shadowColor: "#000000",
+    shadowOpacity: 0.36,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 14
+  },
+  viewerMenuItem: {
+    minHeight: 58,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 10,
+    gap: 12
+  },
+  viewerMenuItemPressed: { backgroundColor: colors.pressedOverlay },
+  viewerMenuLabel: { color: colors.text, fontSize: 14, lineHeight: 18, fontWeight: "800" },
+  viewerMenuLabelDanger: { color: colors.tertiary },
+  viewerMenuCaption: { color: colors.muted, fontSize: 11, lineHeight: 15, fontWeight: "700" },
+  viewerMenuDivider: { height: 1, marginVertical: 4, backgroundColor: colors.outline },
+  sheetLayer: { flex: 1, justifyContent: "flex-end" },
+  sheetCard: {
+    maxHeight: "88%",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    gap: 14
+  },
+  sheetHandle: { alignSelf: "center", width: 44, height: 4, borderRadius: 999, backgroundColor: colors.outline },
+  sheetContent: { paddingBottom: 28, gap: 22 },
+  metaRow: {
+    minHeight: 36,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outline,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14
+  },
+  metaLabel: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  metaValue: { flexShrink: 1, color: colors.text, fontSize: 13, fontWeight: "700", textAlign: "right" },
+  tagChip: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondaryOutline,
+    backgroundColor: colors.secondarySoft,
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
+  tagChipText: { color: colors.secondary, fontSize: 12, fontWeight: "800" },
+  ocrText: { color: colors.text, fontSize: 14, lineHeight: 21 },
+  cardPressed: { opacity: 0.72 },
+  previewFrame: { position: "relative" },
+  categoryBadge: {
+    position: "absolute",
+    left: 10,
+    top: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primaryOutline,
+    backgroundColor: colors.surfaceGlassHighest,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  categoryBadgeText: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  collectionFolderActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  collectionRemoveButton: {
+    position: "absolute",
+    right: 6,
+    top: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceGlassHigh
+  },
+  filterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  countBadge: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  fullWidthCard: { width: "100%" },
+  resultList: { gap: 16 },
+  resultItem: { gap: 8 },
+  matchTermRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
+  matchTerm: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primaryOutline,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 9,
+    paddingVertical: 3
+  },
+  matchTermText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  inlineStatusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  similarList: { gap: 12, paddingRight: 16 },
+  similarTile: { width: 104, gap: 6 },
+  similarImage: { width: 104, height: 104, borderRadius: 10, backgroundColor: colors.surfaceHigh },
+  similarCaption: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  suggestionThumb: { width: "100%", height: 140, borderRadius: 10, backgroundColor: colors.surfaceHigh },
+  buttonDisabled: { opacity: 0.42 },
+  pickerList: { maxHeight: 280 },
+  fullScreenModal: { flex: 1, backgroundColor: colors.background },
+  modalTopBar: {
+    minHeight: 62,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.outline,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  segmentedControl: {
+    flexDirection: "row",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    padding: 3,
+    gap: 3
+  },
+  segment: {
+    minWidth: 42,
+    minHeight: 36,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+  segmentActive: { backgroundColor: colors.primaryContainer },
+  segmentLabel: { color: colors.muted, fontSize: 12, fontWeight: "900" },
+  segmentLabelActive: { color: colors.onPrimary },
+  // Gallery, file-browser flavoured: tight gapless tiles under date headings, so a screen of
+  // screenshots reads as one continuous surface rather than a wall of separate cards. Tile size is
+  // computed from the window width in ScreenshotBrowser, which also owns the 3px gap and padding.
+  galleryContent: { padding: 3 },
+  galleryHeader: { height: 44, justifyContent: "flex-end", paddingHorizontal: 13, paddingBottom: 8 },
+  galleryHeaderText: { color: colors.text, fontSize: 14, fontWeight: "900", letterSpacing: 0.1 },
+  galleryTileRow: { flexDirection: "row", gap: 3, marginBottom: 3 },
+  galleryTile: { borderRadius: 4, overflow: "hidden", backgroundColor: colors.surfaceHigh },
+  galleryTileImage: { width: "100%", height: "100%" },
+  // Selection insets the image instead of drawing a border, so the tile does not shift its neighbours.
+  galleryTileImageSelected: { transform: [{ scale: 0.86 }], borderRadius: 6 },
+  galleryTileCheck: { position: "absolute", right: 4, top: 4 },
+  fileListContent: { paddingBottom: 12 },
+  // Search results and other plain vertical lists of cards. Distinct from fileListContent, which is
+  // the file-browser layout where rows are flush and separated by their own dividers.
+  listContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  // Applied on top of listContent by lists that sit behind the floating tab bar, so the last row
+  // can be scrolled clear of it. The library modal has no tab bar and omits this.
+  tabBarClearance: { paddingBottom: 110 },
+  // File-browser row: no card chrome, because a file list is a list of files rather than a stack of
+  // cards. Fixed height, not a minimum — ScreenshotBrowser declares it in getItemLayout, and a row
+  // that could grow would drift the list's scroll offsets. Both text lines are clamped to one.
+  fileRow: {
+    height: 72,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.background
+  },
+  fileRowPressed: { backgroundColor: colors.surfaceHigh },
+  fileRowSelected: { backgroundColor: colors.primarySoft },
+  fileThumb: { width: 46, height: 46, borderRadius: 5, backgroundColor: colors.surfaceHigh },
+  fileName: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  fileMeta: { color: colors.muted, fontSize: 12, fontWeight: "600", marginTop: 3 },
+  footerLoader: { paddingVertical: 20, alignItems: "center" },
+  emptyState: { paddingTop: 64, paddingHorizontal: 32, alignItems: "center", gap: 10 },
+  searchScreen: { flex: 1, backgroundColor: colors.background },
+  searchHeader: { paddingHorizontal: 16, paddingTop: 12, gap: 12 },
+  // Sits beside the input rather than in it, so a long query never pushes the button off-screen.
+  searchInputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  filterButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  filterButtonActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  // Small enough to sit on the button's corner without covering the icon behind it.
+  filterBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primaryContainer
+  },
+  filterBadgeText: { color: colors.onPrimary, fontSize: 10, fontWeight: "900" },
+  activeFilterRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 16 },
+  activeFilterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primaryOutline,
+    backgroundColor: colors.primarySoft,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  activeFilterText: { color: colors.text, fontSize: 12, fontWeight: "800" },
+  filterSectionLabel: { color: colors.muted, fontSize: 11, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
+  filterSection: { gap: 10 },
+  filterDetailRow: { minHeight: 66, borderRadius: 12, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors.surfaceGlassHigh, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  filterDetailRowActive: { borderColor: colors.primaryOutline, backgroundColor: colors.primarySoft },
+  filterDetailIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+  filterDetailLabel: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: "900" },
+  filterOptionPanel: { borderRadius: 12, borderWidth: 1, borderColor: colors.outline, backgroundColor: colors.background, padding: 12, flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  filterOption: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  filterOptionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  filterOptionText: { color: colors.text, fontSize: 13, fontWeight: "800" },
+  filterOptionCount: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  filterSwitchRow: {
+    minHeight: 56,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  sheetFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.outline,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  // The footer buttons share the width evenly, so their labels need centering the base styles omit.
+  sheetFooterButton: { flex: 1, minHeight: 46, alignItems: "center", justifyContent: "center" },
+  // Same bar geometry as the top bar, with the divider moved to the top edge.
+  pickerActionBar: { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: colors.outline },
+  searchStatusRow: { paddingHorizontal: 16, paddingBottom: 4, flexDirection: "row", alignItems: "center", gap: 8 },
+  settingsGroup: { gap: 8 },
+  // Rows are separated by their own divider rather than card gaps, so a group reads as one surface.
+  settingsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface,
+    overflow: "hidden"
+  },
+  settingsRow: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  settingsRowPressed: { backgroundColor: colors.pressedOverlay },
+  settingsRowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft
+  },
+  settingsRowIconDanger: { backgroundColor: colors.secondarySoft },
+  settingsRowTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: "800" },
+  settingsRowTitleDanger: { color: colors.tertiary },
+  settingsRowValue: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  folderRow: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors.surface
+  },
+  folderRowActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  // Keeps an answer and the images it is made of together as one unit in the transcript.
+  answerBlock: { gap: 10 }
   });
 }
 

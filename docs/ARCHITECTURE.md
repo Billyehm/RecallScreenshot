@@ -37,13 +37,23 @@ HomeScreen / CollectionsScreen
   -> ScreenshotMediaStore + SQLite
 ```
 
-For mock memory data:
+For search and the assistant:
 
 ```text
-ChatScreen / CollectionsScreen / StatsScreen
-  -> memory hooks
-  -> memoryService
-  -> MockMemoryRepository
+SearchScreen / ChatScreen
+  -> useSearch / useConversation
+  -> searchService
+  -> ScreenshotMediaStore.searchText (native ranker)
+```
+
+For categories and stats:
+
+```text
+CollectionsScreen        StatsScreen
+  -> collection hooks      -> useIndexStatus / useStorageInfo / useCategoryCounts
+  -> collectionService     -> screenshotService
+  -> SQLiteCollectionRepository       -> ScreenshotMediaStore + SQLite
+   + NativeCollectionSuggestionRepository
 ```
 
 ## Offline image intelligence
@@ -141,18 +151,18 @@ Zustand currently stores only `hasCompletedBootstrap` in `src/core/state/useAppS
 
 This is enough to track whether startup migrations finished. Future global UI or session state can live here when it is truly app-wide.
 
-## Current mock boundaries
+## Data sources
 
-The following areas are mocked today:
+No screen renders mock or sample data. Every figure and list resolves to one of three sources:
 
-- Chat message responses
-- Collection counts and labels
-- AI efficiency metrics
-- Some dashboard stat values
-- Search input behavior
-- New collection and suggestion actions
+- **SQLite** — screenshot metadata, categories, collection membership, tags, settings.
+- **The native index** — recognized text, image labels, embeddings, ranking, similarity, category
+  suggestions, index progress and storage figures, all reached through `ScreenshotMediaStore`.
+- **MediaStore** — the device library itself, scanned for discovery and never copied.
 
-The cleanest replacement path is to implement a real `MemoryRepository` and pass it into `MemoryService`, keeping screens and hooks mostly unchanged.
+The assistant is not a generative model. `useConversation` answers by running the question through
+`searchService` and describing what the index returned, so an answer can always be traced to
+specific indexed images.
 
 ## Native and platform boundaries
 

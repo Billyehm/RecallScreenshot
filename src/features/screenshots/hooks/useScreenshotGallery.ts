@@ -1,85 +1,49 @@
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState } from "react-native";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
 import { queryKeys } from "../../../shared/utils/queryKeys";
+import type { CategoryCount, ScreenshotFilter } from "../domain/screenshotMetadata";
 import { screenshotService } from "../services/screenshotService";
-import { androidMediaPermissionService, type MediaPermissionStatus } from "../services/androidMediaPermissionService";
+import { useLibrarySync } from "./useLibrarySync";
+import { canReadImages, useMediaPermission } from "./useMediaPermission";
 
 const PAGE_SIZE = 40;
 
-function canReadImages(status: MediaPermissionStatus | "checking") {
-  return status === "granted" || status === "limited";
-}
+/** Stable identity for an unfetched result, so consumers do not see a new array every render. */
+const NO_COUNTS: CategoryCount[] = [];
 
-export function useScreenshotGallery(pageSize = PAGE_SIZE) {
+type GalleryOptions = {
+  pageSize?: number;
+  filter?: ScreenshotFilter;
+};
+
+export function useScreenshotGallery({ pageSize = PAGE_SIZE, filter }: GalleryOptions = {}) {
   const queryClient = useQueryClient();
-  const [permissionStatus, setPermissionStatus] = useState<MediaPermissionStatus | "checking">("checking");
+  const category = filter?.category;
+  const collectionId = filter?.collectionId;
 
-  const requestAccess = useCallback(async () => {
-    const status = await androidMediaPermissionService.requestReadImagesPermission();
-    setPermissionStatus(status);
-    if (canReadImages(status)) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.screenshots });
-    }
-    return status;
+  const refreshScreenshots = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.screenshots });
   }, [queryClient]);
 
-  useEffect(() => {
-    let active = true;
-    androidMediaPermissionService.getReadImagesPermissionStatus().then(async (status) => {
-      if (!active) return;
-      if (status === "granted" || status === "limited" || status === "unsupported") {
-        setPermissionStatus(status);
-        return;
-      }
-
-      const requestedStatus = await androidMediaPermissionService.requestReadImagesPermission();
-      if (active) setPermissionStatus(requestedStatus);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", async (nextState) => {
-      if (nextState !== "active") return;
-
-      const status = await androidMediaPermissionService.getReadImagesPermissionStatus();
-      setPermissionStatus(status);
-      if (canReadImages(status)) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.screenshots });
-      }
-    });
-
-    return () => subscription.remove();
-  }, [queryClient]);
+  const { status: permissionStatus, requestAccess, openSettings } = useMediaPermission(refreshScreenshots);
+  const isReadable = canReadImages(permissionStatus);
 
   const query = useInfiniteQuery({
-    queryKey: queryKeys.screenshotPage(pageSize),
+    queryKey: queryKeys.screenshotPage(pageSize, category, collectionId),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => screenshotService.listScreenshots(pageSize, pageParam),
+    queryFn: ({ pageParam }) => screenshotService.listScreenshots(pageSize, pageParam, { category, collectionId }),
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    enabled: canReadImages(permissionStatus)
+    enabled: isReadable
   });
 
-  useEffect(() => {
-    if (!canReadImages(permissionStatus)) return;
+  const categoryCounts = useQuery({
+    queryKey: queryKeys.categoryCounts,
+    queryFn: () => screenshotService.countByCategory(),
+    enabled: isReadable
+  });
 
-    screenshotService.startWatching();
-    const unsubscribe = screenshotService.subscribe(() => {
-      screenshotService.syncFromMediaStore().finally(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.screenshots });
-      });
-    });
-
-    return () => {
-      unsubscribe();
-      screenshotService.stopWatching();
-    };
-  }, [permissionStatus, queryClient]);
+  useLibrarySync(isReadable);
 
   const screenshots = useMemo(() => {
     const seen = new Set<string>();
@@ -90,16 +54,23 @@ export function useScreenshotGallery(pageSize = PAGE_SIZE) {
     });
   }, [query.data?.pages]);
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
+
+  // Stable across renders: every list passes this straight to onEndReached, and a new identity on
+  // each render invalidates the list's memoized props.
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
   return {
     ...query,
     screenshots,
+    categoryCounts: categoryCounts.data ?? NO_COUNTS,
     permissionStatus,
     requestAccess,
-    openSettings: () => androidMediaPermissionService.openSettings(),
-    loadMore: () => {
-      if (query.hasNextPage && !query.isFetchingNextPage) {
-        query.fetchNextPage();
-      }
-    }
+    openSettings,
+    loadMore
   };
 }

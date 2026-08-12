@@ -1,38 +1,66 @@
 import React, { useMemo, useState } from "react";
-import { Animated, FlatList, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Animated, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 
 import { MetricCard } from "../../../shared/components/MetricCard";
-import { ScreenshotCard } from "../../../shared/components/ScreenshotCard";
+import { SmartScreenshotCarousel } from "../../../shared/components/SmartScreenshotCarousel";
 import { SectionTitle } from "../../../shared/components/SectionTitle";
 import { usePulse } from "../../../shared/hooks/usePulse";
 import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { Screenshot } from "../../../shared/types/recall";
 import { useScreenshotGallery } from "../../screenshots/hooks/useScreenshotGallery";
+import { useIndexStatus } from "../../screenshots/hooks/useIndexStatus";
+import { LibraryScreen } from "../../library/screens/LibraryScreen";
 import { DeviceImageAccessNotice } from "../../screenshots/components/DeviceImageAccessNotice";
+import { ScreenshotViewer } from "../../screenshots/components/ScreenshotViewer";
+import { SearchResultList } from "../../search/components/SearchResultList";
+import { useSemanticSearch } from "../../search/hooks/useSemanticSearch";
 
 type HomeScreenProps = {
   onChatPress: () => void;
 };
 
 export function HomeScreen({ onChatPress }: HomeScreenProps) {
-  const { screenshots, hasNextPage, loadMore, permissionStatus, requestAccess, openSettings } = useScreenshotGallery();
+  const { screenshots, categoryCounts, loadMore, permissionStatus, requestAccess, openSettings } =
+    useScreenshotGallery();
   const { colors, styles } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | undefined>();
+  const [openedShot, setOpenedShot] = useState<Screenshot | null>(null);
+  const [isLibraryOpen, setLibraryOpen] = useState(false);
   const pulse = usePulse();
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1.18] });
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.08] });
-  const normalizedQuery = searchQuery.trim().toLowerCase();
-  const visibleScreenshots = useMemo(
-    () =>
-      normalizedQuery
-        ? screenshots.filter((shot) => `${shot.title} ${shot.source}`.toLowerCase().includes(normalizedQuery))
-        : screenshots,
-    [normalizedQuery, screenshots]
+
+  const index = useIndexStatus();
+  const isReadable = permissionStatus === "granted" || permissionStatus === "limited";
+
+  // The category chip composes with the query rather than replacing it: it is passed down to the
+  // native scan, so a narrow category still returns a full page of ranked results.
+  const { hits, isSearching, isActive } = useSemanticSearch({
+    query: searchQuery,
+    category: activeCategory,
+    enabled: isReadable
+  });
+
+  // Only used for the idle strip. Once a search is active the native ranker owns ordering.
+  const recentScreenshots = useMemo(
+    () => (activeCategory ? screenshots.filter((shot) => shot.category === activeCategory) : screenshots),
+    [activeCategory, screenshots]
   );
 
+  // Hoisted out of the list so the memoized cards keep their props between keystrokes — this
+  // screen re-renders on every character typed into the search field.
+  const indexingLabel =
+    index.state === "running"
+      ? `Indexing images${index.pending ? ` - ${index.pending} left` : ""}`
+      : index.state === "paused"
+        ? "Indexing paused"
+        : "Indexing service idle";
+
   return (
-    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.homeHero}>
         <View style={styles.heroIconRow}>
           <View style={styles.heroIcon}>
@@ -48,12 +76,13 @@ export function HomeScreen({ onChatPress }: HomeScreenProps) {
         <Ionicons name="search" size={20} color={colors.muted} />
         <TextInput
           onChangeText={setSearchQuery}
-          placeholder="Search your digital memory..."
+          placeholder="Search by meaning, e.g. my flight ticket"
           placeholderTextColor={colors.placeholder}
           returnKeyType="search"
           style={styles.searchInput}
           value={searchQuery}
         />
+        {isSearching ? <ActivityIndicator color={colors.primary} size="small" /> : null}
         {searchQuery ? (
           <Pressable accessibilityLabel="Clear search" accessibilityRole="button" onPress={() => setSearchQuery("")} style={styles.searchClearButton}>
             <Ionicons name="close" size={18} color={colors.secondary} />
@@ -68,65 +97,87 @@ export function HomeScreen({ onChatPress }: HomeScreenProps) {
           <Animated.View style={[styles.pulseRing, { opacity, transform: [{ scale }] }]} />
           <View style={styles.pulseDot} />
         </View>
-        <Text style={styles.overline}>Indexing service active</Text>
+        <Text style={styles.overline}>{indexingLabel}</Text>
         <View style={styles.statusLine} />
       </View>
 
-      <SectionTitle icon="sparkles" title="Smart Suggestions" />
-      <View style={styles.chipWrap}>
-        {["Receipts", "Work", "Social", "Code Snippets"].map((item) => (
-          <Pressable
-            accessibilityRole="button"
-            key={item}
-            onPress={() => setSearchQuery((current) => (current === item ? "" : item))}
-            style={[styles.chip, searchQuery === item && styles.selectedChip]}
-          >
-            <Text style={styles.chipText}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {categoryCounts.length ? (
+        <>
+          <SectionTitle icon="sparkles" title="Categories" />
+          <View style={styles.chipWrap}>
+            {categoryCounts.map(({ category, count }) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeCategory === category }}
+                key={category}
+                onPress={() => setActiveCategory((current) => (current === category ? undefined : category))}
+                style={[styles.chip, activeCategory === category && styles.selectedChip]}
+              >
+                <Text style={styles.chipText}>{category}</Text>
+                <Text style={styles.countBadge}>{count}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.sectionTitleText}>Recent Images</Text>
-          <Text style={styles.bodyMuted}>From your device library</Text>
+        <View style={styles.flexOne}>
+          <Text style={styles.sectionTitleText}>
+            {isActive ? "Results" : activeCategory ? activeCategory : "Recent Images"}
+          </Text>
+          <Text style={styles.bodyMuted}>
+            {isActive
+              ? `${hits.length} ranked by relevance${activeCategory ? ` in ${activeCategory}` : ""}`
+              : "From your device library"}
+          </Text>
         </View>
-        {screenshots.length > 0 && hasNextPage ? (
-          <Pressable accessibilityRole="button" onPress={loadMore} style={styles.linkButton}>
-            <Text style={styles.linkText}>View More</Text>
+        {!isActive && screenshots.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={() => setLibraryOpen(true)} style={styles.linkButton}>
+            <Text style={styles.linkText}>See more</Text>
           </Pressable>
         ) : null}
       </View>
-      {visibleScreenshots.length ? (
-        <FlatList
-          horizontal
-          data={visibleScreenshots}
-          keyExtractor={(shot) => shot.id}
-          renderItem={({ item }) => <ScreenshotCard shot={item} />}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.6}
-          initialNumToRender={6}
-          maxToRenderPerBatch={8}
-          windowSize={5}
-          removeClippedSubviews
-        />
-      ) : permissionStatus === "granted" || permissionStatus === "limited" ? (
+
+      {isActive ? (
+        hits.length ? (
+          <SearchResultList hits={hits} onOpen={setOpenedShot} />
+        ) : isSearching ? (
+          <View style={styles.emptyGallery}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.emptyGalleryBody}>Searching the on-device index...</Text>
+          </View>
+        ) : (
+          <View style={styles.emptyGallery}>
+            <Ionicons name={index.isEmpty ? "hourglass-outline" : "search-outline"} size={28} color={colors.muted} />
+            <Text style={styles.emptyGalleryTitle}>{index.isEmpty ? "Nothing indexed yet" : "No matches"}</Text>
+            {/* An empty index and a genuine miss look identical in the results, so they are named apart. */}
+            <Text style={styles.emptyGalleryBody}>
+              {index.isEmpty
+                ? `Recall is still reading your library${index.discovered ? ` (${index.pending} of ${index.discovered} left)` : ""}. Search works as soon as the first images are processed.`
+                : "No image matches that yet. Try fewer words, or clear the category filter."}
+            </Text>
+          </View>
+        )
+      ) : recentScreenshots.length ? (
+        <SmartScreenshotCarousel screenshots={recentScreenshots} onOpen={setOpenedShot} onEndReached={loadMore} />
+      ) : isReadable ? (
         <View style={styles.emptyGallery}>
-          <Ionicons name={normalizedQuery ? "search-outline" : "images-outline"} size={28} color={colors.muted} />
-          <Text style={styles.emptyGalleryTitle}>{normalizedQuery ? "No matching images" : "No images found yet"}</Text>
+          <Ionicons name={activeCategory ? "search-outline" : "images-outline"} size={28} color={colors.muted} />
+          <Text style={styles.emptyGalleryTitle}>{activeCategory ? "No matching images" : "No images found yet"}</Text>
           <Text style={styles.emptyGalleryBody}>
-            {normalizedQuery ? `No indexed image matches "${searchQuery.trim()}".` : "Images from your device will appear here after Recall indexes them."}
+            {activeCategory
+              ? "Nothing matches that filter yet. Images appear here as the indexer classifies them."
+              : "Images from your device will appear here after Recall indexes them."}
           </Text>
         </View>
       ) : null}
 
       <View style={styles.statGrid}>
-        <MetricCard label="Index Size" value="12,482" color={colors.primary} />
-        <MetricCard label="AI Insights" value="842" color={colors.secondary} />
-        <MetricCard label="Sync Status" value="Active" color={colors.tertiary} />
-        <MetricCard label="Last Index" value="Just now" color="text" />
+        <MetricCard label="Indexed" value={index.indexed.toLocaleString()} color={colors.primary} />
+        <MetricCard label="Queued" value={index.pending.toLocaleString()} color={colors.secondary} />
+        <MetricCard label="Library" value={index.discovered.toLocaleString()} color={colors.tertiary} />
+        <MetricCard label="Status" value={index.state === "running" ? "Indexing" : index.failed ? "Retrying" : "Ready"} color="text" />
       </View>
 
       <Pressable accessibilityRole="button" style={styles.askPanel} onPress={onChatPress}>
@@ -134,6 +185,12 @@ export function HomeScreen({ onChatPress }: HomeScreenProps) {
         <Text style={styles.askText}>Ask AI...</Text>
         <Ionicons name="arrow-forward" size={18} color={colors.primary} />
       </Pressable>
+
+      <ScreenshotViewer screenshots={isActive ? hits.map((hit) => hit.screenshot) : recentScreenshots} screenshot={openedShot} onClose={() => setOpenedShot(null)} onOpenRelated={setOpenedShot} />
+      {/* Mounted only while open so its pages are not fetched behind the home screen. */}
+      {isLibraryOpen ? (
+        <LibraryScreen category={activeCategory} onClose={() => setLibraryOpen(false)} visible />
+      ) : null}
     </ScrollView>
   );
 }

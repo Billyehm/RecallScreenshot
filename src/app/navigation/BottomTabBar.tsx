@@ -9,9 +9,10 @@ import type { RootTabParamList } from "./types";
 
 const tabIcons: Record<keyof RootTabParamList, React.ComponentProps<typeof Ionicons>["name"]> = {
   Home: "home",
-  Chat: "sparkles",
-  Collections: "folder-open",
-  Stats: "stats-chart"
+  Search: "search",
+  Categories: "folder-open",
+  Stats: "stats-chart",
+  Settings: "settings-sharp"
 };
 
 export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -45,7 +46,9 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             style={[styles.navItem, isActive && styles.activeNavItem]}
           >
             <Ionicons name={tabIcons[route.name as keyof RootTabParamList]} size={20} color={isActive ? colors.onPrimary : colors.muted} />
-            <Text style={[styles.navLabel, isActive && styles.activeNavLabel]}>{label}</Text>
+            <Text numberOfLines={1} style={[styles.navLabel, isActive && styles.activeNavLabel]}>
+              {label}
+            </Text>
           </Pressable>
         );
       })}

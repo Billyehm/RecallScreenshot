@@ -5,6 +5,10 @@ let database: NitroSQLiteConnection | null = null;
 export function getSQLiteDatabase() {
   if (!database) {
     database = open({ name: "recall_ai.db" });
+    // Both pragmas are per-connection, so they belong here rather than in a migration that only
+    // ever runs once: without this, ON DELETE CASCADE silently stops firing on later launches.
+    database.execute("PRAGMA foreign_keys = ON");
+    database.execute("PRAGMA journal_mode = WAL");
   }
 
   return database;

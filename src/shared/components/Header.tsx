@@ -16,7 +16,7 @@ export function Header({ onChatPress, onMenuPress }: HeaderProps) {
 
   return (
     <View style={styles.header}>
-      <AnimatedPressable style={styles.brand} onPress={onMenuPress} pressedScale={0.98}>
+      <AnimatedPressable style={styles.brand} onPress={onMenuPress} accessibilityLabel="Open menu" accessibilityRole="button" pressedScale={0.98}>
         <View style={styles.logoMark}>
           <MaterialCommunityIcons name="memory" size={22} color={colors.primary} />
         </View>
@@ -26,7 +26,7 @@ export function Header({ onChatPress, onMenuPress }: HeaderProps) {
         </View>
       </AnimatedPressable>
       <View style={styles.headerActions}>
-        <AnimatedPressable style={styles.iconButton} onPress={onChatPress}>
+        <AnimatedPressable style={styles.iconButton} onPress={onChatPress} accessibilityLabel="Ask Recall" accessibilityRole="button">
           <Ionicons name="sparkles" size={20} color={colors.secondary} />
         </AnimatedPressable>
       </View>

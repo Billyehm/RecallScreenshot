@@ -25,11 +25,11 @@ object ScreenshotCategorizer {
       strong = setOf("iban", "swift", "overdraft", "statement", "payee", "mortgage", "creditcard", "debitcard"),
       normal = setOf("bank", "balance", "payment", "invoice", "receipt", "transfer", "transaction", "deposit", "withdrawal", "loan", "billing", "paypal", "crypto", "wallet", "currency", "refund", "salary", "tax", "budget", "atm"),
     ),
-    "Social" to weighted(
+    "Social Media" to weighted(
       strong = setOf("instagram", "facebook", "tiktok", "linkedin", "reddit", "snapchat", "pinterest", "followers"),
       normal = setOf("social", "twitter", "profile", "post", "story", "reel", "feed", "tweet", "retweet", "hashtag", "follow", "share", "timeline", "friend"),
     ),
-    "Messaging" to weighted(
+    "Messages" to weighted(
       strong = setOf("whatsapp", "telegram", "imessage", "messenger", "signal", "discord"),
       normal = setOf("message", "chat", "sms", "reply", "typing", "conversation", "inbox", "voicemail", "delivered", "unread", "call", "contact"),
     ),
@@ -51,7 +51,7 @@ object ScreenshotCategorizer {
     ),
     "Programming" to weighted(
       strong = setOf("github", "stacktrace", "stackoverflow", "localhost", "npm", "gradle", "kotlin", "typescript", "python", "javascript", "docker", "kubernetes", "compiler"),
-      normal = setOf("code", "function", "error", "exception", "commit", "branch", "merge", "pull", "repository", "terminal", "console", "debug", "api", "json", "sql", "build", "deploy", "variable", "import", "null", "async", "class"),
+      normal = setOf("code", "coding", "programming", "developer", "function", "error", "exception", "commit", "branch", "merge", "pull", "repository", "terminal", "console", "debug", "api", "json", "sql", "build", "deploy", "variable", "import", "null", "async", "class"),
     ),
     "Entertainment" to weighted(
       strong = setOf("netflix", "youtube", "spotify", "twitch", "playstation", "steam", "podcast"),

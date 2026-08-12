@@ -40,16 +40,22 @@ class ThumbnailStore(context: Context) {
   fun isMissing(path: String?): Boolean = path.isNullOrBlank() || !File(path).exists()
 
   /**
-   * Oldest-first eviction once the cache passes the cap. Called once per worker batch instead of
-   * once per image: a single walk of the shard tree rather than one listing per thumbnail written.
+   * Evicts once the cache passes the cap, dropping the oldest *images* first.
+   *
+   * Ordering by image capture time rather than file mtime is deliberate. The pipeline indexes
+   * newest-first, so the newest images are the ones whose thumbnail files were written earliest —
+   * evicting by file mtime therefore discarded exactly the thumbnails the worker's repair pass
+   * scans for (the newest 240 rows), and the two ground against each other indefinitely on any
+   * library past the cap. Capture time is already in the filename, so this costs no extra stat.
+   *
+   * Called once per worker batch instead of once per image: a single walk of the shard tree rather
+   * than one listing per thumbnail written.
    */
   fun prune(): Long {
-    val files = root.listFiles()?.flatMap { shard ->
-      if (shard.isDirectory) shard.listFiles()?.toList() ?: emptyList() else listOf(shard)
-    } ?: return 0L
+    val files = files() ?: return 0L
     var total = files.sumOf { it.length() }
     if (total <= MAX_CACHE_BYTES) return total
-    for (file in files.sortedBy { it.lastModified() }) {
+    for (file in files.sortedBy(::capturedAt)) {
       if (total <= MAX_CACHE_BYTES) break
       val size = file.length()
       if (file.delete()) total -= size
@@ -57,8 +63,32 @@ class ThumbnailStore(context: Context) {
     return total
   }
 
+  /** Bytes the thumbnail cache currently occupies, for the storage breakdown in Settings. */
+  fun totalBytes(): Long = files()?.sumOf { it.length() } ?: 0L
+
+  /**
+   * Drops every cached thumbnail. The rows that referenced them keep their recorded path, which the
+   * worker's existing repair pass already treats as a reclaimed cache entry and regenerates.
+   */
+  fun clear(): Int {
+    val files = files() ?: return 0
+    return files.count(File::delete)
+  }
+
+  /** One walk of the shard tree, shared by pruning, sizing and clearing. */
+  private fun files(): List<File>? = root.listFiles()?.flatMap { shard ->
+    if (shard.isDirectory) shard.listFiles()?.toList() ?: emptyList() else listOf(shard)
+  }
+
   private fun shardFor(id: String): File =
     File(root, "%02x".format(id.hashCode() and 0xFF)).also { it.mkdirs() }
+
+  /**
+   * Source mtime encoded in "${id}_$modifiedAt.jpg" by [write]. Falls back to the file's own mtime
+   * for anything that does not parse, so a stray file still sorts rather than blocking eviction.
+   */
+  private fun capturedAt(file: File): Long =
+    file.name.substringAfterLast('_').substringBeforeLast('.').toLongOrNull() ?: file.lastModified()
 
   companion object {
     private const val DIRECTORY = "recall_thumbnails"

@@ -55,9 +55,11 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * R8 runs on release builds: it strips unused code and obfuscates what remains. The keep rules the
+ * reflective parts of this app need — Nitro's JNI lookups, ML Kit's model registry and the
+ * WorkManager job — are in proguard-rules.pro, next to the reasoning for each.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -71,6 +73,14 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+/**
+ * Release signing credentials live in ~/.gradle/gradle.properties, outside the repository, so the
+ * keystore password never enters version control. When they are absent — a fresh clone, or CI
+ * without secrets — the release build falls back to debug signing so it still assembles; such an
+ * APK is installable for testing but cannot be published.
+ */
+def hasReleaseSigning = project.hasProperty('RECALL_STORE_FILE')
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -92,16 +102,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(RECALL_STORE_FILE)
+                storePassword RECALL_STORE_PASSWORD
+                keyAlias RECALL_KEY_ALIAS
+                keyPassword RECALL_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
+            // Safe alongside minification because the RN CLI generates res/raw/keep.xml, which pins
+            // the icon fonts and navigation drawables that are only ever referenced by name from JS.
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
