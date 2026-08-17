@@ -152,8 +152,22 @@ export function SettingsScreen() {
             title="Folders to index"
           />
           <SettingsRow
+            icon="phone-portrait-outline"
+            subtitle="Visible through Android photo access"
+            title="Images on phone"
+            value={formatCount(index.deviceImages)}
+          />
+          <SettingsRow
+            icon="funnel-outline"
+            subtitle="Match your image type and folder choices"
+            title="Images indexable"
+            value={formatCount(index.indexable)}
+          />
+          <SettingsRow
             icon="checkmark-done-outline"
-            subtitle={`${formatCount(index.pending)} queued · ${formatCount(index.failed)} failed`}
+            subtitle={index.failed && index.lastError
+              ? `${formatCount(index.pending)} queued · ${formatCount(index.failed)} failed · ${index.lastError}`
+              : `${formatCount(index.pending)} queued · ${formatCount(index.failed)} failed`}
             title="Images indexed"
             value={formatCount(index.indexed)}
           />

@@ -23,7 +23,13 @@ data class IndexedImage(
   val height: Int,
 )
 
-data class ScanSummary(val scanId: String, val discovered: Int, val queued: Int, val deleted: Int)
+data class ScanSummary(
+  val scanId: String,
+  val deviceImages: Int,
+  val indexableImages: Int,
+  val queued: Int,
+  val deleted: Int,
+)
 
 /** A device folder the user can bring into or out of indexing scope, with how many images it holds. */
 data class MediaFolder(val name: String, val imageCount: Int, val isIndexed: Boolean)
@@ -46,20 +52,22 @@ class MediaStoreScanner(private val context: Context) {
    */
   fun scanIntoStore(store: RecallIndexStore, allowDeletion: Boolean): ScanSummary {
     val scanId = UUID.randomUUID().toString()
-    var discovered = 0
+    var deviceImages = 0
+    var indexableImages = 0
     var queued = 0
     var chunkRows = 0
     var open = false
     try {
-      query()?.use { cursor ->
+      requireNotNull(query()) { "Android could not read the device image library" }.use { cursor ->
         while (cursor.moveToNext()) {
           val row = cursor.toScannableImage()
+          deviceImages += 1
           if (!isInScope(row)) continue
           if (!open) {
             store.beginScanChunk()
             open = true
           }
-          discovered += 1
+          indexableImages += 1
           if (store.upsertDiscovered(row.image, scanId)) queued += 1
           if (++chunkRows >= CHUNK_SIZE) {
             store.commitScanChunk()
@@ -77,7 +85,8 @@ class MediaStoreScanner(private val context: Context) {
       throw error
     }
     val deleted = store.finishScan(scanId, allowDeletion)
-    return ScanSummary(scanId, discovered, queued, deleted)
+    RecallIndexPreferences.saveLibraryCounts(context, deviceImages, indexableImages)
+    return ScanSummary(scanId, deviceImages, indexableImages, queued, deleted)
   }
 
   fun queryPage(limit: Int, offset: Int): List<IndexedImage> {

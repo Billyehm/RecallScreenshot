@@ -1,7 +1,0 @@
-/home/rcherki10/Projects/RecallAI/node_modules/@react-native-vector-icons/ionicons/android/build/generated/source/codegen/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/@react-native-vector-icons/material-design-icons/android/build/generated/source/codegen/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/react-native-nitro-modules/android/build/generated/source/codegen/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/react-native-nitro-sqlite/android/build/generated/source/codegen/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt
-/home/rcherki10/Projects/RecallAI/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt

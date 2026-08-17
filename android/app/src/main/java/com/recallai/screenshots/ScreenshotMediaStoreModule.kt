@@ -24,7 +24,8 @@ import java.util.concurrent.Executors
 class ScreenshotMediaStoreModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   private val executor = Executors.newSingleThreadExecutor()
   private val store by lazy { RecallIndexStore(context).also(RecallIndexStore::ensureReady) }
-  private val searchEngine by lazy { OfflineSearchEngine(context, store) }
+  private val searchEngineDelegate = lazy { OfflineSearchEngine(context, store) }
+  private val searchEngine by searchEngineDelegate
   private val suggestionEngine by lazy { CollectionSuggestionEngine(store) }
   private var observer: ContentObserver? = null
 
@@ -90,15 +91,20 @@ class ScreenshotMediaStoreModule(private val context: ReactApplicationContext) :
   @ReactMethod
   fun getIndexStatus(promise: Promise) = onBackground(promise) {
     val counts = store.counts()
+    val library = RecallIndexPreferences.libraryCounts(context)
+    val failure = store.latestFailure()
     Arguments.createMap().apply {
       putString("state", when {
         RecallIndexScheduler.isPaused(context) -> "paused"
-        counts.processing > 0 || counts.pending > 0 -> "running"
+        counts.processing > 0 || counts.pending > 0 || RecallIndexScheduler.hasActiveWork(context) -> "running"
         else -> "idle"
       })
       putInt("discovered", counts.pending + counts.processing + counts.completed + counts.failed)
+      putInt("deviceImages", library.deviceImages)
+      putInt("indexableImages", library.indexableImages)
       putInt("pending", counts.pending); putInt("processing", counts.processing)
       putInt("completed", counts.completed); putInt("failed", counts.failed)
+      putString("lastError", failure?.message?.take(160))
     }
   }
 
@@ -429,6 +435,7 @@ class ScreenshotMediaStoreModule(private val context: ReactApplicationContext) :
     // A delete awaiting confirmation can never resolve now; leaving it would hang the JS promise.
     pendingDelete?.promise?.reject(ERROR_CODE, "Module was torn down before the delete was confirmed")
     pendingDelete = null
+    if (searchEngineDelegate.isInitialized()) searchEngine.close()
     executor.shutdownNow()
     super.invalidate()
   }

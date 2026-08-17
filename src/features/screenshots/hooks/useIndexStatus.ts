@@ -22,6 +22,9 @@ export function useIndexStatus() {
     pending: (data?.pending ?? 0) + (data?.processing ?? 0),
     failed: data?.failed ?? 0,
     discovered: data?.discovered ?? 0,
+    deviceImages: data?.deviceImages ?? 0,
+    indexable: data?.indexableImages ?? 0,
+    lastError: data?.lastError ?? null,
     /** Nothing has been processed yet, so an empty result set means "not ready", not "no match". */
     isEmpty: (data?.completed ?? 0) === 0
   };

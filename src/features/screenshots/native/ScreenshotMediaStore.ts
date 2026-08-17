@@ -51,10 +51,15 @@ export type NativeCollectionSuggestion = {
 export type ImageIndexStatus = {
   state: "idle" | "running" | "paused";
   discovered: number;
+  /** Images visible through the current Android photo permission. */
+  deviceImages: number;
+  /** Visible images admitted by the selected image and folder scope. */
+  indexableImages: number;
   pending: number;
   processing: number;
   completed: number;
   failed: number;
+  lastError: string | null;
 };
 
 /**
@@ -169,7 +174,7 @@ export const ScreenshotMediaStore = {
 
   getIndexStatus(): Promise<ImageIndexStatus> {
     if (!nativeModule) {
-      return Promise.resolve({ state: "idle", discovered: 0, pending: 0, processing: 0, completed: 0, failed: 0 });
+      return Promise.resolve({ state: "idle", discovered: 0, deviceImages: 0, indexableImages: 0, pending: 0, processing: 0, completed: 0, failed: 0, lastError: null });
     }
     return nativeModule.getIndexStatus();
   },

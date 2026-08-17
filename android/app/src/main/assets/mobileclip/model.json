@@ -1,0 +1,10 @@
+{
+  "name": "MobileCLIP2-B",
+  "source": "apple/MobileCLIP2-B",
+  "checkpoint_sha256": "144b1344f5f01f08af8be1077f0db5eec95bf0fd1e349c1e9ca6102724448486",
+  "quantization": "ONNX Runtime dynamic INT8, per-tensor",
+  "image_input": [1, 3, 224, 224],
+  "text_input": [1, 77],
+  "embedding_output": [1, 512],
+  "embedding_version": 5
+}

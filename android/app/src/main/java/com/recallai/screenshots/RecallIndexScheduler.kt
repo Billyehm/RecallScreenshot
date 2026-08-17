@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.WorkInfo
 import java.util.concurrent.TimeUnit
 
 object RecallIndexScheduler {
@@ -24,7 +25,7 @@ object RecallIndexScheduler {
     WorkManager.getInstance(context).enqueueUniquePeriodicWork(
       PERIODIC, ExistingPeriodicWorkPolicy.KEEP,
       PeriodicWorkRequestBuilder<RecallIndexWorker>(12, TimeUnit.HOURS)
-        .setConstraints(constraints()).setInputData(input(scanFirst = true)).build(),
+        .setConstraints(backgroundConstraints()).setInputData(input(scanFirst = true)).build(),
     )
   }
 
@@ -48,11 +49,23 @@ object RecallIndexScheduler {
   fun scheduleIfNotPaused(context: Context) = enqueueImmediate(context)
   fun isPaused(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(PAUSED, false)
 
+  /** Includes the initial MediaStore scan, before it has inserted rows for count-based status. */
+  fun hasActiveWork(context: Context): Boolean {
+    val manager = WorkManager.getInstance(context)
+    return listOf(IMMEDIATE, CONTINUATION).any { name ->
+      manager.getWorkInfosForUniqueWork(name).get().any { info ->
+        info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.RUNNING || info.state == WorkInfo.State.BLOCKED
+      }
+    }
+  }
+
+  // User-triggered and continuation work must start immediately. Battery/storage gates made the UI
+  // say "Running" while WorkManager was actually waiting indefinitely for an unknown constraint.
   private fun request(scanFirst: Boolean) = OneTimeWorkRequestBuilder<RecallIndexWorker>()
-    .setConstraints(constraints()).setInputData(input(scanFirst)).build()
+    .setInputData(input(scanFirst)).build()
   private fun input(scanFirst: Boolean) = Data.Builder().putBoolean(RecallIndexWorker.KEY_SCAN_FIRST, scanFirst).build()
   private fun setPaused(context: Context, paused: Boolean) =
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(PAUSED, paused).apply()
-  private fun constraints() = Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+  private fun backgroundConstraints() = Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED)
     .setRequiresStorageNotLow(true).setRequiresBatteryNotLow(true).build()
 }

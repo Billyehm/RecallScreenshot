@@ -21,6 +21,8 @@ object RecallIndexPreferences {
   private const val FOLDERS = "indexed-folders"
   private const val FOLDERS_CHOSEN = "indexed-folders-chosen"
   private const val SCOPE = "index-scope"
+  private const val DEVICE_IMAGE_COUNT = "device-image-count"
+  private const val INDEXABLE_IMAGE_COUNT = "indexable-image-count"
 
   /**
    * What kinds of image Recall is allowed to index. Screenshots only until the user widens it, so
@@ -71,6 +73,21 @@ object RecallIndexPreferences {
   fun resetFolders(context: Context) {
     prefs(context).edit().remove(FOLDERS).putBoolean(FOLDERS_CHOSEN, false).apply()
   }
+
+  /** Last completed MediaStore scan, used by status UI without repeatedly scanning the library. */
+  fun saveLibraryCounts(context: Context, deviceImages: Int, indexableImages: Int) {
+    prefs(context).edit()
+      .putInt(DEVICE_IMAGE_COUNT, deviceImages.coerceAtLeast(0))
+      .putInt(INDEXABLE_IMAGE_COUNT, indexableImages.coerceAtLeast(0))
+      .apply()
+  }
+
+  fun libraryCounts(context: Context) = LibraryCounts(
+    deviceImages = prefs(context).getInt(DEVICE_IMAGE_COUNT, 0),
+    indexableImages = prefs(context).getInt(INDEXABLE_IMAGE_COUNT, 0),
+  )
+
+  data class LibraryCounts(val deviceImages: Int, val indexableImages: Int)
 
   private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

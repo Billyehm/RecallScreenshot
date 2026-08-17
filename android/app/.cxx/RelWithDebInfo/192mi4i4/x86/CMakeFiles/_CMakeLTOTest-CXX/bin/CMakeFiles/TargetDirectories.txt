@@ -1,4 +1,0 @@
-/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
-/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
-/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
-/home/rcherki10/Projects/RecallAI/android/app/.cxx/RelWithDebInfo/192mi4i4/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir

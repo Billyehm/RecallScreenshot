@@ -63,6 +63,8 @@ data class IndexCounts(
   val failed: Int,
 )
 
+data class IndexFailure(val message: String)
+
 /**
  * Resolves database names into [Context.getFilesDir] instead of the platform `databases/` directory.
  *
@@ -506,6 +508,13 @@ class RecallIndexStore(context: Context) : SQLiteOpenHelper(
     return IndexCounts(counts["Pending"] ?: 0, counts["Processing"] ?: 0, counts["Completed"] ?: 0, counts["Failed"] ?: 0)
   }
 
+  fun latestFailure(): IndexFailure? = readableDatabase.rawQuery(
+    "SELECT processing_error FROM screenshot_metadata WHERE is_deleted = 0 AND processing_status = 'Failed' AND processing_error IS NOT NULL ORDER BY updated_at DESC LIMIT 1",
+    null,
+  ).use { cursor ->
+    if (!cursor.moveToFirst()) null else IndexFailure(cursor.getString(0))
+  }
+
   fun findByUri(uri: String): SearchRow? = readableDatabase.rawQuery(
     "$SEARCH_COLUMNS WHERE m.media_store_uri = ? AND m.is_deleted = 0 LIMIT 1", arrayOf(uri),
   ).use { cursor -> if (cursor.moveToFirst()) cursor.toSearchRow() else null }
@@ -870,6 +879,4 @@ class RecallIndexStore(context: Context) : SQLiteOpenHelper(
     }
   }
 }
-
-
 

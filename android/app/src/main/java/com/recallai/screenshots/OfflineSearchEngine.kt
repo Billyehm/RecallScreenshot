@@ -42,7 +42,8 @@ data class SearchFilters(
 class OfflineSearchEngine(
   private val context: Context,
   private val store: RecallIndexStore,
-) {
+) : AutoCloseable {
+  private val mobileClip = MobileClipModel(context)
   /**
    * [filters] are the explicit controls on the search screen. They exclude rows before the candidate
    * heap rather than trimming the ranked page afterwards, so a narrow filter still fills a full page.
@@ -59,11 +60,8 @@ class OfflineSearchEngine(
     val parsed = SearchQuery.parse(query, now)
     val weights = if (parsed.hasTerms) RankingWeights.TEXT else RankingWeights.BROWSE
 
-    val semantic = OfflineEmbedding.textEmbedding(parsed.phrase)
-    val vector = FloatArray(OfflineImageIntelligence.EMBEDDING_DIMENSIONS).also { semantic.copyInto(it) }
-    // Compared over the semantic half alone. A text query carries no visual signal, so including the
-    // visual dimensions would penalise stored vectors in proportion to how photographic they are.
-    val vectorQuery = VectorQuery(vector, 0, OfflineImageIntelligence.SEMANTIC_DIMENSIONS)
+    val vector = if (parsed.hasTerms) mobileClip.textEmbedding(parsed.phrase) else FloatArray(MobileClipModel.EMBEDDING_DIMENSIONS)
+    val vectorQuery = VectorQuery(vector, 0, MobileClipModel.EMBEDDING_DIMENSIONS)
 
     val lexical = store.lexicalMatches(parsed.tokens, LEXICAL_CANDIDATES)
     val candidates = collect(
@@ -75,10 +73,8 @@ class OfflineSearchEngine(
   }
 
   /**
-   * Similarity uses the image's stored vector when it is already indexed. When it is not, only the
-   * visual descriptor can be computed, so the comparison is restricted to the visual dimensions on
-   * both sides. The source image also lends its category, which keeps the results topically close
-   * rather than merely similar in colour and layout.
+   * Similarity uses the stored MobileCLIP vector when available and embeds an unindexed source image
+   * on demand otherwise. Both paths use the same 512-dimensional multimodal space.
    */
   fun searchSimilar(uri: String, limit: Int, now: Long = System.currentTimeMillis()): List<IndexSearchResult> {
     val safeLimit = limit.coerceIn(1, MAX_LIMIT)
@@ -88,7 +84,7 @@ class OfflineSearchEngine(
       VectorQuery(stored, 0, stored.size)
     } else {
       val visual = OfflineImageIntelligence(context).use { it.imageEmbedding(Uri.parse(uri)) }
-      VectorQuery(visual, OfflineImageIntelligence.SEMANTIC_DIMENSIONS, OfflineImageIntelligence.EMBEDDING_DIMENSIONS)
+      VectorQuery(visual, 0, MobileClipModel.EMBEDDING_DIMENSIONS)
     }
 
     val intent = source?.let { SearchQuery.forCategory(it.category, it.categoryConfidence) } ?: SearchQuery.EMPTY
@@ -100,11 +96,7 @@ class OfflineSearchEngine(
     return rank(candidates, intent, RankingWeights.SIMILARITY, safeLimit)
   }
 
-  /**
-   * Bounded min-heap over the full stream: only [capacity] candidates are ever retained, whatever
-   * the library size. Rows whose vector predates the current model still participate — the hash
-   * space is shared across versions, so a stale vector ranks a little worse rather than not at all.
-   */
+  /** Bounded min-heap: only [capacity] current indexed candidates are retained. */
   private fun collect(
     query: VectorQuery,
     lexical: Map<String, Float>,
@@ -223,4 +215,6 @@ class OfflineSearchEngine(
     const val LEXICAL_CANDIDATES = 1000
     val EMPTY_OCR = OcrResult("", 0f, "und")
   }
+
+  override fun close() = mobileClip.close()
 }

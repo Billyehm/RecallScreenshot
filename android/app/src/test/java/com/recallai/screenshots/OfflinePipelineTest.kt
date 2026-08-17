@@ -81,12 +81,10 @@ class OfflinePipelineTest {
   }
 
   @Test
-  fun textEmbeddingsAreNormalizedAndDeterministic() {
-    val first = OfflineEmbedding.textEmbedding("Find my hotel booking")
-    val second = OfflineEmbedding.textEmbedding("Find my hotel booking")
-    assertArrayEquals(first, second, 0f)
-    val squaredNorm = first.sumOf { (it * it).toDouble() }
-    assertEquals(1.0, squaredNorm, 0.0001)
+  fun mobileClipEmbeddingContractTriggersAFullMigration() {
+    assertEquals(512, MobileClipModel.EMBEDDING_DIMENSIONS)
+    assertEquals(5, MobileClipModel.EMBEDDING_VERSION)
+    assertTrue(MobileClipModel.EMBEDDING_VERSION > 4)
   }
 
   // --- Indexing vocabulary -------------------------------------------------------------------
@@ -103,13 +101,8 @@ class OfflinePipelineTest {
   }
 
   @Test
-  fun fillerWordsNoLongerReachTheEmbedding() {
-    assertArrayEquals(
-      OfflineEmbedding.textEmbedding("bank statement"),
-      OfflineEmbedding.textEmbedding("the screenshot of my bank statement"),
-      0f,
-    )
-    assertEquals(OfflineImageIntelligence.SEMANTIC_DIMENSIONS, OfflineEmbedding.textEmbedding("bank").size)
+  fun fillerWordsStayOutOfLexicalEvidence() {
+    assertEquals(listOf("bank", "statement"), OfflineEmbedding.contentTokens("the screenshot of my bank statement"))
   }
 
   // --- Query understanding -------------------------------------------------------------------

@@ -121,11 +121,8 @@ object SearchRanker {
    * Cosine over a half-open dimension range, with the query norm supplied once per search rather
    * than recomputed per candidate.
    *
-   * The range matters. A text query fills only the semantic half of the vector and an un-indexed
-   * image fills only the visual half, while stored vectors are normalized across both. Comparing
-   * over the full length would therefore rank by how much of each stored vector's magnitude happens
-   * to sit in the half the query can see. Restricting both sides to the same range and normalizing
-   * there compares like with like.
+   * The range remains useful to callers that intentionally compare a vector slice. MobileCLIP text
+   * and image vectors both occupy the full shared 512-dimensional space.
    */
   fun cosine(query: FloatArray, queryNorm: Float, candidate: FloatArray, from: Int, to: Int): Float {
     if (queryNorm <= 0f || from >= to || to > query.size || to > candidate.size) return 0f

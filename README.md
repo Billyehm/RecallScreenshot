@@ -42,6 +42,8 @@ collection picker presented as full-screen modals, and the AI assistant in a sid
 - Nitro SQLite
 - MMKV
 - React Native vector icons
+- ML Kit text recognition and image labeling (bundled variants)
+- ONNX Runtime with MobileCLIP2-B INT8 image and text encoders
 
 ## Project structure
 
@@ -82,6 +84,31 @@ Install dependencies:
 npm install
 ```
 
+### Provision the on-device models
+
+The two MobileCLIP2-B ONNX graphs and the CLIP tokenizer vocabulary are about 151 MB and are **not
+tracked in git**, so a fresh clone does not have them. Without them the app builds and installs but
+every image fails to index and every search errors, because `MobileClipModel` cannot open its assets.
+
+Apple's MobileCLIP2-B checkpoint is gated: accept the terms at
+[huggingface.co/apple/MobileCLIP2-B](https://huggingface.co/apple/MobileCLIP2-B) and download it.
+Then:
+
+```sh
+pip install open_clip_torch onnxruntime torch
+python tools/mobileclip/setup_assets.py --checkpoint /path/to/mobileclip2_b.pt
+```
+
+To check an existing checkout without needing the checkpoint or torch:
+
+```sh
+python tools/mobileclip/setup_assets.py --verify
+```
+
+`assets/mobileclip/model.json` stays in git and records the expected checkpoint hash, so the script
+refuses a checkpoint that would produce different embeddings than the ones the app was verified
+against. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full pipeline.
+
 Start Metro:
 
 ```sh
@@ -111,6 +138,14 @@ npm run android:apk
 ```
 
 The command cleans Android outputs before Gradle creates and embeds a new JavaScript bundle. The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. If Metro is showing stale code during development, restart it with `npm run start:reset`.
+
+Release builds target `arm64-v8a` only. The app memory-maps ~151 MB of INT8 ONNX graphs, which is
+fragile in a 32-bit address space and slow on armeabi-v7a CPUs, and x86/x86_64 are emulator-only.
+For an x86_64 emulator, override the ABI for that invocation:
+
+```sh
+cd android && ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64
+```
 
 ## Current data model
 

@@ -86,9 +86,11 @@ class RecallIndexWorker(context: Context, parameters: WorkerParameters) : Corout
     /**
      * Images per run. Each run reopens the store, constructs the ML Kit models and enqueues a
      * continuation, so a small batch pays that fixed cost very often; too large a batch risks
-     * WorkManager's execution window on a slow device. Sixteen keeps a run comfortably short.
+     * WorkManager's execution window on a slow device. MobileCLIP batches stay deliberately small.
      */
-    private const val BATCH_SIZE = 16
+    // MobileCLIP2-B is substantially heavier than the descriptor this worker originally ran.
+    // Small batches reliably finish inside WorkManager's execution window on lower-end phones.
+    private const val BATCH_SIZE = 4
     private const val STALE_PROCESSING_MS = 30 * 60 * 1000L
 
     /** Newest indexed rows checked for a reclaimed thumbnail, once indexing has drained. */

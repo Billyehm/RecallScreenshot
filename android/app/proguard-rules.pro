@@ -28,6 +28,10 @@
 -keep class com.google.android.gms.internal.mlkit_** { *; }
 -dontwarn com.google.mlkit.**
 
+# ONNX Runtime's Java facade resolves the native runtime over JNI.
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
+
 # --- Recall's own reflective entry points ---------------------------------------------------------
 # WorkManager persists the worker's class name in its database and instantiates it reflectively on
 # the next run. androidx.work's consumer rule is -keepnames, which prevents renaming but still allows

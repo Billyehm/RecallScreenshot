@@ -95,6 +95,45 @@ For schema changes:
 3. Avoid changing old migrations after they may have shipped to a device.
 4. Update repository row types and mappers at the same time.
 
+## On-device models
+
+`android/app/src/main/assets/mobileclip/` holds the two MobileCLIP2-B INT8 ONNX graphs and the CLIP
+BPE vocabulary — about 151 MB. The weights are **not** tracked in git; `model.json` and
+`LICENSE_MODELS` are, so the expected checkpoint hash and the upstream licence stay in the repository
+even though the binaries do not.
+
+`tools/mobileclip/setup_assets.py` rebuilds the directory:
+
+```sh
+pip install open_clip_torch onnxruntime torch
+python tools/mobileclip/setup_assets.py --checkpoint /path/to/mobileclip2_b.pt
+```
+
+The pipeline is: verify the checkpoint hash against `model.json` → export fp32 graphs with
+`open_clip` → dynamic INT8 quantization → copy the BPE vocabulary out of the installed `open_clip`
+→ refresh the manifest → verify. Nothing reaches the network; the gated checkpoint is downloaded by
+hand from [huggingface.co/apple/MobileCLIP2-B](https://huggingface.co/apple/MobileCLIP2-B).
+
+`--verify` alone needs neither torch nor the checkpoint, so it is the cheap pre-build gate:
+
+```sh
+python tools/mobileclip/setup_assets.py --verify
+```
+
+It checks the three files exist, that the vocabulary decompresses with at least the 48,894 merges
+`ClipTokenizer` reads, and — when `onnxruntime` is installed — that each graph's input name and
+shape and its `[1, 512]` output match what `MobileClipModel` binds.
+
+Three constants are a contract across the Kotlin and Python sides. Changing one alone silently
+degrades every embedding rather than failing:
+
+- **Preprocessing range.** The graphs are exported with `image_mean=(0,0,0)`, `image_std=(1,1,1)`
+  because `MobileClipModel.preprocess` feeds planar RGB in 0..1 with no mean subtraction.
+- **Merge count.** `MERGE_COUNT` in the script and `ClipTokenizer.MERGE_COUNT` must agree, or every
+  token id shifts.
+- **`embedding_version`.** `MobileClipModel.EMBEDDING_VERSION` and the manifest's field must agree.
+  Raising it requeues every indexed row, which is how a new model rolls out.
+
 ## Release builds
 
 Signing reads four properties, which belong in `~/.gradle/gradle.properties` rather than the
@@ -130,10 +169,22 @@ to read an obfuscated production stack trace.
 Verify in this order; each gate catches a different class of failure:
 
 ```
+python tools/mobileclip/setup_assets.py --verify
 npx tsc --noEmit
 cd android && ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleRelease
 ```
+
+The asset check goes first because a missing model is invisible to every other gate: the APK
+assembles, installs and opens, then fails on the first image it tries to index.
+
+Release builds target `arm64-v8a` only (`reactNativeArchitectures` in `android/gradle.properties`).
+Shipping all four ABIs cost 118 MB of emulator-only x86 libraries and a 36 MB armeabi-v7a slice whose
+CPUs cannot run MobileCLIP2-B at a usable speed; the release APK is ~210 MB rather than 383 MB. That
+is still dominated by the 151 MB of `noCompress` ONNX graphs, so getting materially below it means
+moving them into a Play Asset Delivery install-time pack rather than trimming ABIs further. For an
+x86_64 emulator, override the ABI per invocation with
+`-PreactNativeArchitectures=x86_64`.
 
 Since R8 never runs in debug, install and exercise the release APK — indexing, search, delete —
 before trusting it.
@@ -141,10 +192,11 @@ before trusting it.
 ## Current limitations
 
 - No JavaScript test suite. `npx tsc --noEmit` is the only static gate on the TypeScript side; the
-  Kotlin pipeline is covered by `OfflinePipelineTest`.
+  Kotlin pipeline is covered by `OfflinePipelineTest`, and the ONNX graphs and tokenizer by
+  `MobileClipIntegrationTest`, which is an instrumented test and needs a connected device.
 - No lint configuration is checked in, so `npx eslint` fails outright.
-- Search ranks on recognized text and image labels. The stats screen reports index and storage
-  counts, not measured inference timings.
+- Search ranks MobileCLIP embeddings together with recognized text and image labels. The stats screen
+  reports index and storage counts, not measured inference timings.
 - Android only in practice. `ios/` holds the stock RN scaffold, but the indexing pipeline, search,
   OCR and thumbnails are all Kotlin — there is no iOS implementation of `ScreenshotMediaStore`.
 
